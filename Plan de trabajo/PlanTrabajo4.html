@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe de Refactorización ITV LEO v7.5.1 — Parte 4/4</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --bg3: #21262d;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text2: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #1f6feb;
+  --green: #3fb950;
+  --yellow: #d29922;
+  --red: #f85149;
+  --orange: #f0883e;
+  --purple: #bc8cff;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+h1 { color: var(--accent); border-bottom: 2px solid var(--accent2); padding-bottom: 12px; margin-top: 0; }
+h2 { color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-top: 40px; }
+h3 { color: var(--purple); margin-top: 28px; }
+h4 { color: var(--yellow); margin-top: 20px; }
+.meta { color: var(--text2); font-size: 0.9em; margin-bottom: 24px; }
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.badge-min { background: #238636; color: #fff; }
+.badge-low { background: #1f6feb; color: #fff; }
+.badge-med { background: #d29922; color: #000; }
+.badge-high { background: #f85149; color: #fff; }
+.badge-done { background: #3fb950; color: #000; }
+.badge-wait { background: #6e7681; color: #fff; }
+.badge-ok { background: #238636; color: #fff; }
+.badge-warn { background: #d29922; color: #000; }
+.badge-err { background: #f85149; color: #fff; }
+.badge-new { background: #bc8cff; color: #000; }
+
+.callout {
+  border-left: 4px solid var(--accent);
+  background: var(--bg2);
+  padding: 16px 20px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+}
+.callout-warn { border-left-color: var(--yellow); }
+.callout-err { border-left-color: var(--red); }
+.callout-green { border-left-color: var(--green); }
+.callout-new { border-left-color: var(--purple); }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  background: var(--bg2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+th, td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  background: var(--bg3);
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+tr:hover { background: rgba(88,166,255,0.05); }
+td.num { text-align: right; font-family: monospace; }
+
+.toc {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.toc ul { margin: 8px 0; padding-left: 20px; }
+.toc li { margin: 4px 0; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+
+.code {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+  font-size: 0.85em;
+  overflow-x: auto;
+  margin: 12px 0;
+  color: #e6edf3;
+}
+.code .comment { color: #8b949e; }
+.code .keyword { color: #ff7b72; }
+.code .string { color: #a5d6ff; }
+.code .func { color: #d2a8ff; }
+
+.step {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.step-num {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--accent2);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.1em;
+  flex-shrink: 0;
+}
+.step-title { font-size: 1.15em; font-weight: 600; color: var(--accent); }
+
+.dependency-graph {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  font-family: monospace;
+  font-size: 0.85em;
+  line-height: 1.8;
+  overflow-x: auto;
+}
+.dependency-graph .file { color: var(--accent); }
+.dependency-graph .import { color: var(--yellow); }
+.dependency-graph .circular { color: var(--red); font-weight: bold; }
+.dependency-graph .note { color: var(--text2); }
+
+.footer {
+  margin-top: 60px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 0.85em;
+  text-align: center;
+}
+
+.revision-box {
+  background: var(--bg2);
+  border: 2px solid var(--purple);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.revision-box h3 { color: var(--purple); margin-top: 0; }
+.revision-box ul { margin: 8px 0; padding-left: 20px; }
+.revision-box li { margin: 6px 0; }
+
+.ram-check {
+  background: var(--bg3);
+  border: 1px dashed var(--green);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.nav-parts {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin: 20px 0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.nav-parts .part-label { color: var(--text2); font-size: 0.85em; }
+.nav-parts .part-link {
+  color: var(--accent);
+  text-decoration: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--bg3);
+  font-size: 0.85em;
+}
+.nav-parts .part-link:hover { background: var(--border); }
+.nav-parts .part-link.active {
+  background: var(--accent2);
+  color: #fff;
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📡 Informe de Refactorización — ITV LEO v7.5.1</h1>
+<div class="meta">
+  Fecha: 22 de julio de 2026 &nbsp;|&nbsp; Estado: <span class="badge badge-wait">PRE-INSTALACIÓN</span> &nbsp;|&nbsp;
+  Revisión: <span class="badge badge-new">v2.1</span> &nbsp;|&nbsp;
+  Próximo paso crítico: <strong>Subir placa al techo + antena ajustada</strong>
+</div>
+
+<div class="nav-parts">
+  <span class="part-label">Partes del documento:</span>
+  <span class="part-link">Parte 1: Introducción + Estado + Problemas</span>
+  <span class="part-link">Parte 2: Plan + Fase A (Fusiones)</span>
+  <span class="part-link">Parte 3: Fases B, C, D</span>
+  <span class="part-link active">Parte 4: Fases E-G + Dependencias + Checklists</span>
+</div>
+
+<!-- ============================================================ -->
+<div class="toc">
+  <strong>📋 Tabla de contenidos — Parte 4/4</strong>
+  <ul>
+    <li><a href="#fase-e">11. Fase E — Persistencia (OPCIONAL, archivado)</a></li>
+    <li><a href="#fase-f">12. Fase F — Desmantelar fase3_utils.py</a></li>
+    <li><a href="#fase-g">13. Fase G — Limpieza de Imports Muertos</a></li>
+    <li><a href="#circular">14. Resolución del Import Circular</a></li>
+    <li><a href="#dependencias">15. Mapa de Dependencias</a></li>
+    <li><a href="#checklist">16. Checklist de Validación</a></li>
+    <li><a href="#ram-checkpoints">17. Checkpoints de RAM por Fase</a></li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="fase-e">11. Fase E — Extraer Persistencia de <code>logger.py</code> <span class="badge badge-wait">OPCIONAL</span> <span class="badge badge-med">Riesgo Medio</span></h2>
+
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">E</div>
+    <div class="step-title">Persistencia → persistence.py <span class="badge badge-wait">NO EJECUTAR</span></div>
+  </div>
+  <p><strong>Motivo:</strong> <code>logger.py</code> tiene 10 funciones de lectura/escritura de ficheros que no son "logging": capturas, estado pendiente, heartbeats, logs, etc.</p>
+  <p><strong>Funciones a mover:</strong></p>
+  <ul>
+    <li><code>escribir_captura()</code>, <code>leer_todas_las_capturas()</code>, <code>borrar_capturas()</code>, <code>hay_capturas_pendientes()</code></li>
+    <li><code>leer_logs_pendientes()</code>, <code>guardar_logs()</code>, <code>guardar_para_reintento()</code></li>
+    <li><code>leer_estado_pendiente()</code>, <code>borrar_estado_pendiente()</code></li>
+    <li><code>escribir_heartbeat()</code>, <code>rotar_logs_txt()</code>, <code>leer_archivo_texto()</code>, <code>leer_errores_para_email()</code></li>
+  </ul>
+  <p><strong>Queda en <code>logger.py</code>:</strong></p>
+  <ul>
+    <li><code>log_info()</code>, <code>log_debug()</code>, <code>log_warn()</code>, <code>log_error()</code>, <code>log_exception()</code></li>
+    <li><code>log_persistente()</code>, <code>log_rx_diag()</code></li>
+  </ul>
+  <p><strong>Impacto:</strong> Muchos ficheros afectados (<code>fase3.py</code>, <code>fase4.py</code>, <code>fase3_utils.py</code>, <code>itv_manager.py</code>). <span class="badge badge-warn">Alto impacto en imports</span>.</p>
+  <p><strong>Veredicto:</strong> <span class="badge badge-err">NO EJECUTAR</span>. El beneficio arquitectural es marginal frente al riesgo de tocar ~8 ficheros. Las funciones de persistencia de <code>fase3_utils.py</code> irán directamente a <code>logger.py</code> en Fase F. Fase E queda archivada como referencia para una refactorización mayor en el futuro (v8.0+).</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="fase-f">12. Fase F — Desmantelar <code>fase3_utils.py</code> <span class="badge badge-new">COMPLETADO</span> <span class="badge badge-med">Riesgo Medio</span></h2>
+
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">F</div>
+    <div class="step-title">Análisis y distribución de fase3_utils.py</div>
+  </div>
+
+  <div class="callout callout-new">
+    <strong>Análisis cruzado completado:</strong> Tras revisar <code>alertas.py</code> y <code>logger.py</code>, se ha determinado la distribución definitiva de cada función.
+  </div>
+
+  <div class="table-wrap">
+  <table>
+  <tr><th>Función</th><th>Categoría</th><th>Destino</th><th>Importada por</th><th>Notas</th></tr>
+  <tr><td><code>verificar_agenda_o_reiniciar()</code></td><td>Orquestación</td><td><code>fase3.py</code></td><td><code>fase3.py</code></td><td>Llama <code>guardar_fase(1)</code> + <code>reiniciar()</code></td></tr>
+  <tr><td><code>mostrar_proximos_pases()</code></td><td>Display/UX</td><td><code>fase3.py</code></td><td><code>fase3.py</code></td><td>Solo <code>print()</code> de agenda</td></tr>
+  <tr><td><code>mostrar_estado_pase()</code></td><td>Display/UX</td><td><code>fase3.py</code></td><td><code>fase3.py</code></td><td>Solo <code>print()</code> de estado</td></tr>
+  <tr><td><code>procesar_recepcion()</code></td><td>Recepción/Negocio</td><td><code>fase3.py</code></td><td><code>fase3.py</code></td><td><strong>Core del bucle RX</strong></td></tr>
+  <tr><td><code>leer_ultimos_heartbeats()</code></td><td>Persistencia</td><td><code>logger.py</code></td><td><code>fase3_utils.py</code> (interno), <code>fase4.py</code></td><td>Lee <code>heartbeat.log</code></td></tr>
+  <tr><td><code>contar_capturas_pendientes()</code></td><td>Persistencia</td><td><code>logger.py</code></td><td><code>fase3_utils.py</code> (interno), <code>fase4.py</code></td><td>Cuenta <code>satelites_cazados.txt</code></td></tr>
+  <tr><td><code>enviar_email_estado()</code></td><td><strong>Dividir</strong></td><td>Ver abajo</td><td><code>fase3.py</code></td><td>Mezcla 3 responsabilidades</td></tr>
+  <tr><td><code>escribir_heartbeat_fase3()</code></td><td>Wrapper</td><td><strong>Eliminar</strong></td><td><code>fase3.py</code></td><td>Wrapper redundante de <code>logger.escribir_heartbeat()</code></td></tr>
+  <tr><td><code>sincronizar_ntp_si_necesario()</code></td><td>Orquestación/Red</td><td><code>fase3.py</code> o <code>red.py</code></td><td><code>fase3.py</code></td><td>Usa <code>red.conectar_wifi</code>, <code>sincronizar_ntp</code>, <code>reiniciar</code></td></tr>
+  </table>
+  </div>
+
+  <h4>División de <code>enviar_email_estado()</code></h4>
+  <p>Esta función mezcla 3 responsabilidades y viola el principio de orquestación:</p>
+  <div class="table-wrap">
+  <table>
+  <tr><th>Parte</th><th>Destino</th><th>Qué hace</th></tr>
+  <tr><td>A. Leer heartbeats/capturas, construir <code>estado_pendiente.json</code></td><td><code>logger.py</code> como <code>preparar_estado_pendiente()</code></td><td>Persistencia pura</td></tr>
+  <tr><td>B. <code>guardar_fase(4)</code></td><td><code>fase3.py</code></td><td>Orquestación (transición de fase)</td></tr>
+  <tr><td>C. Lógica "¿enviar email?" (horas fijas, flags)</td><td><code>fase3.py</code></td><td>Decisión del orquestador</td></tr>
+  </table>
+  </div>
+
+  <h4>Funciones a añadir a <code>logger.py</code></h4>
+  <div class="code">
+<span class="keyword">def</span> <span class="func">leer_ultimos_heartbeats</span>(max_lineas=200):
+    <span class="keyword">try</span>:
+        <span class="keyword">with</span> <span class="func">open</span>(<span class="string">"heartbeat.log"</span>, <span class="string">"r"</span>) <span class="keyword">as</span> f:
+            todas = [l.strip() <span class="keyword">for</span> l <span class="keyword">in</span> f.readlines() <span class="keyword">if</span> l.strip()]
+        <span class="keyword">return</span> todas[-max_lineas:] <span class="keyword">if</span> <span class="func">len</span>(todas) > max_lineas <span class="keyword">else</span> todas
+    <span class="keyword">except</span> OSError:
+        <span class="keyword">return</span> []
+
+<span class="keyword">def</span> <span class="func">contar_capturas_pendientes</span>(fichero=<span class="string">"satelites_cazados.txt"</span>):
+    <span class="keyword">try</span>:
+        <span class="keyword">with</span> <span class="func">open</span>(fichero, <span class="string">"r"</span>) <span class="keyword">as</span> f:
+            <span class="keyword">return</span> <span class="func">len</span>([l <span class="keyword">for</span> l <span class="keyword">in</span> f.readlines() <span class="keyword">if</span> l.strip()])
+    <span class="keyword">except</span>:
+        <span class="keyword">return</span> 0
+
+<span class="keyword">def</span> <span class="func">preparar_estado_pendiente</span>(hb_lines, capturas, temp_cpu, ventilador_on,
+                                fs_libre_kb, paquetes_capturados, paquetes_descartados):
+    <span class="string">"""Construye estado_pendiente.json. NO llama guardar_fase()."""</span>
+    estado = {
+        <span class="string">"tipo"</span>: <span class="string">"estado"</span>,
+        <span class="string">"timestamp"</span>: time.time(),
+        <span class="string">"heartbeats"</span>: hb_lines,
+        <span class="string">"capturas_count"</span>: <span class="func">len</span>(capturas),
+        <span class="string">"capturas"</span>: capturas[-50:] <span class="keyword">if</span> capturas <span class="keyword">else</span> [],
+        <span class="string">"temp_cpu"</span>: temp_cpu,
+        <span class="string">"ventilador_on"</span>: ventilador_on,
+        <span class="string">"fs_libre_kb"</span>: fs_libre_kb,
+        <span class="string">"paquetes_capturados"</span>: paquetes_capturados,
+        <span class="string">"paquetes_descartados"</span>: paquetes_descartados,
+        <span class="string">"errores"</span>: leer_errores_para_email(<span class="string">"errores.log"</span>)
+    }
+    <span class="keyword">with</span> <span class="func">open</span>(<span class="string">"estado_pendiente.json"</span>, <span class="string">"w"</span>) <span class="keyword">as</span> f:
+        json.dump(estado, f)
+        f.flush()
+        os.sync()
+    <span class="keyword">return</span> estado
+  </div>
+
+  <h4>Destino de funciones de persistencia de fase3_utils.py</h4>
+  <div class="callout callout-green">
+    <strong>Decisión tomada:</strong> Fase E <strong>NO se ejecuta</strong>. Por tanto, todas las funciones de persistencia de <code>fase3_utils.py</code> van a <code>logger.py</code> en Fase F.
+  </div>
+
+  <div class="dependency-graph">
+Fase E = <span class="circular">NO EJECUTA</span>
+  └── persistencia de fase3_utils.py → <span class="file">logger.py</span>
+       (logger.py sigue siendo "todo-ficheros"; aceptado)
+  </div>
+
+  <p><strong>Razón:</strong> Separar persistencia de logging en MicroPython consume RAM extra por el nuevo módulo <code>persistence.py</code>, y el beneficio de pureza arquitectural no compensa el riesgo en hardware con recursos limitados. Si en el futuro <code>logger.py</code> crece por encima de 500 líneas, reconsiderar Fase E para v8.0+.</p>
+
+  <h4>Limpieza de imports tras F</h4>
+  <div class="table-wrap">
+  <table>
+  <tr><th>Fichero afectado</th><th>Cambio</th></tr>
+  <tr><td><code>fase3.py</code></td><td>Eliminar <code>import fase3_utils</code> o <code>from fase3_utils import ...</code></td></tr>
+  <tr><td><code>fase4.py</code></td><td>Eliminar <code>import fase3_utils</code> (si existía)</td></tr>
+  <tr><td><code>itv_manager.py</code></td><td>Eliminar <code>import fase3_utils</code> (si existía)</td></tr>
+  <tr><td>Filesystem</td><td>Eliminar <code>fase3_utils.py</code> del dispositivo</td></tr>
+  </table>
+  </div>
+
+  <p><strong>Impacto:</strong> -1 fichero. Mejora cohesión de <code>alertas.py</code> y <code>logger.py</code>. <strong>Validación:</strong> Arranque completo fase3 sin errores de import.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="fase-g">13. Fase G — Limpieza de Imports Muertos <span class="badge badge-new">INCREMENTAL + FINAL</span> <span class="badge badge-low">Riesgo Bajo</span></h2>
+
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">G</div>
+    <div class="step-title">Eliminar imports sobrantes tras cada fase + revisión global</div>
+  </div>
+
+  <p><strong>Motivo:</strong> Tras las fases A-F, múltiples ficheros tendrán imports que apuntan a módulos eliminados o funciones movidas. Dejarlos causa <code>ImportError</code> al arrancar.</p>
+
+  <div class="callout callout-new">
+    <strong>Novedad respecto al plan original:</strong> La limpieza de imports ya no es solo una fase final, sino un <strong>paso obligatorio tras cada sub-fase</strong> (A.1, A.2, A.3, A.4, B.1, C.1, C.2, C.3, D.1, D.3, F). La Fase G es la <strong>revisión global final</strong>.
+  </div>
+
+  <h4>Tabla completa de imports a eliminar/reemplazar (revisión global)</h4>
+  <div class="table-wrap">
+  <table>
+  <tr><th>Fichero afectado</th><th>Import a eliminar</th><th>Motivo (fusión que lo causó)</th></tr>
+  <tr><td><code>radio_manager.py</code></td><td><code>from radio_base import RadioBase</code></td><td>A.1: RadioBase ahora está en radio_manager.py</td></tr>
+  <tr><td><code>main.py</code>, <code>fase1.py</code>, <code>fase2.py</code>, <code>fase3.py</code>, <code>fase4.py</code>, <code>red.py</code>, <code>itv_manager.py</code>, <code>fase3_utils.py</code></td><td><code>import estado</code>, <code>import configuracion</code></td><td>A.2: Reemplazados por <code>config_system</code></td></tr>
+  <tr><td><code>fase3.py</code></td><td><code>from config_fase3 import ConfigFase3</code></td><td>A.3: Ahora en <code>config_system.ConfigFase3</code></td></tr>
+  <tr><td><code>fase3.py</code></td><td><code>from email_state import EstadoEmail</code></td><td>A.4: Ahora en <code>alertas.EstadoEmail</code></td></tr>
+  <tr><td><code>tiempo.py</code></td><td><code>import datos_satelites</code></td><td>D.1: <code>obtener_desfase_espana</code> ahora es local</td></tr>
+  <tr><td><code>fase1.py</code></td><td><code>import datos_satelites</code> (si solo usaba desfase)</td><td>D.1: Usar <code>from tiempo import obtener_desfase_espana</code></td></tr>
+  <tr><td><code>alertas.py</code></td><td><code>import datos_satelites</code> (si solo usaba desfase)</td><td>D.1: Usar <code>from tiempo import obtener_desfase_espana</code></td></tr>
+  <tr><td><code>datos_satelites.py</code></td><td>Eliminar <code>def obtener_desfase_espana(...)</code></td><td>D.1: Función movida a tiempo.py</td></tr>
+  <tr><td><code>datos_satelites.py</code></td><td>Añadir <code>from tiempo import obtener_desfase_espana</code></td><td>D.1: Reemplaza la función eliminada</td></tr>
+  <tr><td><code>fase3.py</code>, <code>fase4.py</code></td><td><code>def _comprobar_prg()</code>, <code>def _detectar_confirmacion_itv_prg()</code></td><td>C.2: Reemplazadas por <code>placa.detectar_pulsacion_prg()</code></td></tr>
+  <tr><td><code>itv_manager.py</code></td><td><code>from config_system import guardar_fase</code> (si existía)</td><td>C.3: Transición ahora en fase3.py</td></tr>
+  <tr><td><code>itv_manager.py</code></td><td><code>import alertas</code> (si solo enviaba emails)</td><td>C.1: Emails ahora en alertas.py, itv_manager solo prepara datos</td></tr>
+  <tr><td><code>fase3.py</code>, <code>fase4.py</code>, <code>itv_manager.py</code></td><td><code>import fase3_utils</code> o <code>from fase3_utils import ...</code></td><td>F: fase3_utils.py eliminado</td></tr>
+  </table>
+  </div>
+
+  <div class="callout callout-new">
+    <strong>Verificación de consumidores de email_state.py:</strong> Tras revisar el código fuente, <code>email_state.py</code> solo es importado por <code>fase3.py</code> (<code>from email_state import EstadoEmail</code>). <code>alertas.py</code> NO importa <code>email_state.py</code> directamente. Por tanto, solo <code>fase3.py</code> requiere actualización tras A.4.
+  </div>
+
+  <p><strong>Acción (revisión global):</strong></p>
+  <ol>
+    <li>Buscar todos los imports de módulos eliminados: <code>grep -r "from radio_base\|import estado\|import configuracion\|from config_fase3\|from email_state\|import fase3_utils" *.py</code></li>
+    <li>Eliminar o reemplazar cada uno según la tabla.</li>
+    <li>Validar: arranque completo sin <code>ImportError</code>.</li>
+  </ol>
+
+  <div class="callout callout-warn">
+    <strong>⚠️ No automatizar:</strong> En MicroPython, un <code>ImportError</code> puede dejar la placa en estado irrecuperable sin REPL. Revisar cada fichero manualmente, línea por línea.
+  </div>
+
+  <p><strong>Validación:</strong> Soft-reset (Ctrl+D) tras limpieza. Todos los módulos cargan sin errores. Ciclo fase1→fase2→fase3 funciona.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="circular">14. Resolución del Import Circular</h2>
+
+<h3>14.1 Diagrama del problema (original)</h3>
+<div class="dependency-graph">
+<span class="file">tiempo.py</span> ──importa──► <span class="circular">datos_satelites.py</span> (obtener_desfase_espana)
+<span class="file">datos_satelites.py</span> ──importa──► <span class="circular">tiempo.py</span> (obtener_tiempo_actual)
+
+<span class="note">Truco actual: imports lazy dentro de funciones. Funciona pero es frágil.</span>
+</div>
+
+<h3>14.2 Solución: Extraer zona horaria pura</h3>
+<div class="dependency-graph">
+<span class="file">tiempo.py</span> ◄──contiene── <span class="func">obtener_desfase_espana()</span>
+<span class="file">datos_satelites.py</span> ──importa──► <span class="file">tiempo.py</span> (obtener_desfase_espana + obtener_tiempo_actual)
+<span class="file">tiempo.py</span> ──NO importa──► <span class="file">datos_satelites.py</span>
+
+<span class="note">Resultado: dependencia unidireccional. tiempo.py es "hoja" del grafo.</span>
+</div>
+
+<h3>14.3 Ficheros afectados por el cambio</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fichero</th><th>Cambio</th></tr>
+<tr><td><code>tiempo.py</code></td><td>Añadir <code>obtener_desfase_espana()</code>, eliminar <code>import datos_satelites</code></td></tr>
+<tr><td><code>datos_satelites.py</code></td><td>Eliminar <code>obtener_desfase_espana()</code>, añadir <code>from tiempo import obtener_desfase_espana</code></td></tr>
+<tr><td><code>fase1.py</code></td><td>Cambiar <code>import datos_satelites</code> → <code>from tiempo import obtener_desfase_espana</code></td></tr>
+<tr><td><code>alertas.py</code></td><td>Cambiar <code>datos_satelites.obtener_desfase_espana</code> → <code>tiempo.obtener_desfase_espana</code></td></tr>
+</table>
+</div>
+
+<h3>14.4 Circular secundario: <code>config_system.py</code> ↔ <code>logger.py</code></h3>
+<div class="dependency-graph">
+<span class="file">config_system.py</span> ──NO importa──► <span class="file">logger.py</span>
+<span class="file">logger.py</span> ──importa──► <span class="file">config_system.py</span> (obtener_config, leer_fase)
+
+<span class="note">Resultado: dependencia unidireccional. config_system.py es "hoja" del grafo.</span>
+<span class="note">Mecanismo: config_system.py usa raise en lugar de log_error. El llamador loguea.</span>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="dependencias">15. Mapa de Dependencias (objetivo post-refactor)</h2>
+
+<div class="dependency-graph">
+<span class="file">main.py</span>
+└── <span class="file">config_system.py</span> (obtener_config, leer_fase, guardar_fase, version, ConfigFase3)
+    ├── <span class="file">fase1.py</span>
+    │   ├── <span class="file">placa.py</span>
+    │   ├── <span class="file">logger.py</span>
+    │   ├── <span class="file">red.py</span>
+    │   ├── <span class="file">tiempo.py</span> (obtener_desfase_espana)
+    │   └── <span class="file">datos_satelites.py</span> (descargar_agenda)
+    ├── <span class="file">fase2.py</span>
+    │   ├── <span class="file">placa.py</span>
+    │   ├── <span class="file">red.py</span>
+    │   ├── <span class="file">logger.py</span>
+    │   └── <span class="file">alertas.py</span> (enviar_correo_bloques)
+    ├── <span class="file">fase3.py</span> (orquestador principal)
+    │   ├── <span class="file">placa.py</span> (detectar_pulsacion_prg)
+    │   ├── <span class="file">logger.py</span> (escribir_heartbeat, preparar_estado_pendiente, etc.)
+    │   ├── <span class="file">tiempo.py</span>
+    │   ├── <span class="file">red.py</span>
+    │   ├── <span class="file">doppler_motor.py</span>
+    │   ├── <span class="file">radio_manager.py</span> (incluye RadioBase)
+    │   ├── <span class="file">sweep_params.py</span> <span class="note">(o sweep_engine.py si A.3b decide renombrar)</span>
+    │   ├── <span class="file">sat_identifier.py</span>
+    │   ├── <span class="file">alertas.py</span> (EstadoEmail + construir_email_*)
+    │   ├── <span class="file">itv_manager.py</span>
+    │   └── <span class="file">config_system.py</span> (guardar_fase para transición)
+    └── <span class="file">fase4.py</span>
+        ├── <span class="file">placa.py</span> (detectar_pulsacion_prg)
+        ├── <span class="file">logger.py</span>
+        ├── <span class="file">tiempo.py</span>
+        ├── <span class="file">red.py</span>
+        ├── <span class="file">alertas.py</span> (enviar_correo_bloques, construir_email_*)
+        ├── <span class="file">itv_manager.py</span> (obtener_datos_email_itv)
+        └── <span class="file">datos_satelites.py</span> (obtener_objeto_satelite)
+
+<span class="file">datos_satelites.py</span>
+├── <span class="file">tiempo.py</span> (obtener_desfase_espana, obtener_tiempo_actual)
+└── <span class="file">logger.py</span>
+
+<span class="file">alertas.py</span>
+├── <span class="file">tiempo.py</span> (obtener_tiempo_actual, obtener_unix_utc_real, obtener_desfase_espana)
+├── <span class="file">config_system.py</span> (obtener_config para horas estado)
+└── <span class="file">logger.py</span>
+
+<span class="file">itv_manager.py</span>
+├── <span class="file">logger.py</span>
+└── <span class="file">tiempo.py</span>
+
+<span class="file">logger.py</span>
+├── <span class="file">config_system.py</span> (obtener_config)
+└── <span class="file">tiempo.py</span> (obtener_tiempo_actual)
+
+<span class="note">Módulos hoja (sin imports de negocio): placa.py, red.py, tiempo.py,</span>
+<span class="note">sweep_params.py (o sweep_engine.py), doppler_motor.py, sat_identifier.py</span>
+<span class="note">config_system.py centraliza: obtener_config, leer_fase, guardar_fase, borrar_estado, ConfigFase3. Único punto de entrada para configuración. NO importa logger.py.</span>
+<span class="note">Nota: Tras D.1, alertas.py ya no depende de datos_satelites.py. El desfase horario viene de tiempo.py.</span>
+<span class="note">Nota: Tras C.1, itv_manager.py no construye ni envía emails (eso es alertas.py). Tras C.3, no importa config_system.py para guardar_fase. fase3.py orquesta la transición.</span>
+<span class="note">Nota: sweep_params.py aparece como módulo hoja. Si A.3b decide renombrar a sweep_engine.py, actualizar esta referencia.</span>
+<span class="note">Bibliotecas externas (no tocar): sx1262.py, sx126x.py, _sx126x.py, ssd1306.py</span>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="checklist">16. Checklist de Validación Post-Refactor</h2>
+
+<h3>16.1 Por fase (ejecutar tras cada una)</h3>
+<div class="callout callout-warn">
+  <strong>Nota:</strong> Las fases A-D, F y G son el plan principal. La <strong>Fase E está archivada</strong> y no se ejecuta. Persistencia de <code>fase3_utils.py</code> va directamente a <code>logger.py</code> en Fase F.
+</div>
+<div class="table-wrap">
+<table>
+<tr><th>Fase</th><th>Validación</th><th>Resultado esperado</th></tr>
+<tr><td><strong>A.1</strong></td><td>Inicializar radio en fase3</td><td>RX continuo activo, parámetros correctos</td></tr>
+<tr><td><strong>A.2</strong></td><td>Arranque completo fase1→fase2→fase3→fase4</td><td>Fases cambian correctamente, config se lee</td></tr>
+<tr><td><strong>A.2b</strong> <span class="badge badge-new">NUEVO</span></td><td>Verificar que config_system.py NO importa logger.py</td><td><code>grep "import logger" config_system.py</code> → sin resultados</td></tr>
+<tr><td><strong>A.3</strong></td><td>ConfigFase3 lee parámetros correctamente</td><td>Horas fijas, sweep, ventilador OK</td></tr>
+<tr><td><strong>A.4</strong></td><td>Email de estado en hora fija</td><td>Envía a la hora configurada</td></tr>
+<tr><td><strong>A.3b</strong> <span class="badge badge-wait">OPCIONAL</span></td><td>Sweep funciona correctamente (solo si se fusiona/renombra)</td><td>Parámetros de sweep OK en fase3</td></tr>
+<tr><td><strong>B.1</strong></td><td>Email de estado con heartbeats + capturas</td><td>Cuerpo correcto, fragmentación OK</td></tr>
+<tr><td><strong>C.1</strong></td><td>ITV forzada manualmente</td><td>Email ITV recibido con métricas correctas</td></tr>
+<tr><td><strong>C.2</strong></td><td>PRG 3 pulsaciones en fase3 y fase4</td><td>Marca ITV realizada, LED parpadea 5 veces</td></tr>
+<tr><td><strong>C.3</strong></td><td>Transición automática fase3→fase4 por umbral de días</td><td>Transiciona sin errores, no hay circular</td></tr>
+<tr><td><strong>C.3b</strong> <span class="badge badge-new">NUEVO</span></td><td>Verificar que itv_manager.py NO importa guardar_fase ni alertas</td><td><code>grep "guardar_fase\|import alertas" itv_manager.py</code> → sin resultados</td></tr>
+<tr><td><strong>D.1</strong></td><td>Hora local correcta (Thonny + campo)</td><td>UTC+1/+2 según DST, sin desfase</td></tr>
+<tr><td><strong>D.2</strong> <span class="badge badge-wait">POSPUESTO</span></td><td>Descarga agenda N2YO (sin cambios, solo validar)</td><td>Agenda.json correcto, pases ordenados</td></tr>
+<tr><td><strong>D.3</strong></td><td>Horas automáticas de estado</td><td>Calcula huecos entre pases correctamente</td></tr>
+<tr><td><strong>F</strong> <span class="badge badge-new">NUEVO</span></td><td>Arranque fase3 sin fase3_utils.py</td><td>Sin errores de import, funciones migradas OK</td></tr>
+<tr><td><strong>G</strong> <span class="badge badge-new">NUEVO</span></td><td>Ningún import muerto en ningún .py</td><td>Soft-reset sin ImportError</td></tr>
+</table>
+</div>
+
+<h3>16.2 Validación general post-refactor completo</h3>
+<ul>
+  <li>☐ Ciclo completo 24h en techo sin errores</li>
+  <li>☐ Recepción de paquetes de al menos 1 satélite objetivo</li>
+  <li>☐ Email de estado enviado con heartbeats y capturas</li>
+  <li>☐ Email ITV enviado si se fuerza o alcanza umbral de días</li>
+  <li>☐ PRG 3 pulsaciones marca ITV realizada en fase3 y fase4</li>
+  <li>☐ Transición fase3→fase4 por umbral sin circular</li>
+  <li>☐ Agenda se regenera automáticamente al cambiar de día</li>
+  <li>☐ RAM libre > 22KB antes de cada envío de email</li>
+  <li>☐ Temperatura CPU &lt; 55°C, ventilador funciona</li>
+  <li>☐ Reinicio automático tras errores de red/radio</li>
+  <li>☐ Contador de días estable durante 48h</li>
+  <li>☐ <span class="badge badge-new">NUEVO</span> Ningún módulo hoja (config_system.py, tiempo.py) importa módulos de negocio</li>
+  <li>☐ <span class="badge badge-new">NUEVO</span> fase3_utils.py eliminado del filesystem</li>
+</ul>
+
+<h3>16.3 Smoke test post-G (ciclo acelerado) <span class="badge badge-new">NUEVO</span></h3>
+<div class="callout callout-new">
+  <strong>Nuevo paso obligatorio tras Fase G:</strong> Validación de ciclo completo acelerado para verificar que todo el grafo de dependencias carga correctamente.
+</div>
+
+<p><strong>Procedimiento:</strong></p>
+<ol>
+  <li>Soft-reset (Ctrl+D) para cargar todos los módulos desde cero.</li>
+  <li>Forzar fase1: <code>config_system.guardar_fase(1)</code> + reiniciar.</li>
+  <li>Verificar que fase1 arranca, descarga agenda, transiciona a fase2.</li>
+  <li>Verificar que fase2 envía reporte diario, transiciona a fase3.</li>
+  <li>En fase3, verificar RX continuo, heartbeat, sweep.</li>
+  <li>Forzar transición a fase4: PRG 3 pulsaciones o <code>config_system.guardar_fase(4)</code>.</li>
+  <li>En fase4, verificar envío de email de estado.</li>
+  <li>Volver a fase1: <code>config_system.guardar_fase(1)</code> + reiniciar.</li>
+</ol>
+
+<p><strong>Tiempo estimado:</strong> 5-10 minutos (vs. 24h de validación normal).</p>
+<p><strong>Resultado esperado:</strong> Todas las fases cargan sin <code>ImportError</code>. Todos los módulos del grafo se resuelven correctamente. El ciclo fase1→fase2→fase3→fase4→fase1 es funcional.</p>
+
+<!-- ============================================================ -->
+<h2 id="ram-checkpoints">17. Checkpoints de RAM por Fase <span class="badge badge-new">NUEVO</span></h2>
+
+<div class="callout callout-new">
+  <strong>Por qué son necesarios:</strong> Fusionar módulos no siempre libera RAM en MicroPython. Si el módulo combinado se carga en más sitios, el bytecode puede ocupar más memoria. El objetivo real es "más RAM libre", no "menos ficheros".
+</div>
+
+<h3>17.1 Definición de Baseline</h3>
+<div class="ram-check">
+<p><strong>Baseline = RAM libre tras <code>gc.collect()</code> justo después de importar todos los módulos del sistema en estado pre-refactor, con la placa en fase3 activa.</strong></p>
+<p>Script para medir baseline:</p>
+<div class="code">
+<span class="keyword">import</span> gc
+<span class="comment"># Dejar que fase3 arranque normalmente y estabilice</span>
+<span class="comment"># (radio en RX, agenda cargada, loop principal corriendo)</span>
+gc.collect()
+baseline_ram = gc.mem_free()
+<span class="keyword">print</span>(<span class="string">"BASELINE RAM:"</span>, baseline_ram, <span class="string">"bytes"</span>)
+<span class="comment"># Anotar este valor en la tabla de §17.3</span>
+</div>
+</div>
+
+<h3>17.2 Script de medición por fase</h3>
+<div class="ram-check">
+<p>Ejecutar en REPL de MicroPython <strong>antes y después</strong> de cada sub-fase:</p>
+<div class="code">
+<span class="keyword">import</span> gc
+gc.collect()
+ram_antes = gc.mem_free()
+<span class="keyword">print</span>(<span class="string">"RAM libre:"</span>, ram_antes, <span class="string">"bytes"</span>)
+
+<span class="comment"># Ejecutar la fusión, reiniciar, importar todo...</span>
+
+<span class="keyword">import</span> gc
+gc.collect()
+ram_despues = gc.mem_free()
+<span class="keyword">print</span>(<span class="string">"RAM libre:"</span>, ram_despues, <span class="string">"bytes"</span>)
+<span class="keyword">print</span>(<span class="string">"Diferencia:"</span>, ram_despues - ram_antes, <span class="string">"bytes"</span>)
+</div>
+</div>
+
+<h3>17.3 Criterios de aceptación</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fase</th><th>Criterio</th><th>Acción si falla</th></tr>
+<tr><td><strong>Baseline</strong></td><td>Medir RAM en fase3 pre-refactor</td><td>Anotar valor de referencia para comparar</td></tr>
+<tr><td><strong>A.1</strong> (radio)</td><td>RAM no empeora > 500 bytes vs baseline</td><td>Impacto esperado casi nulo; si empeora > 500B, verificar que no se carga código duplicado</td></tr>
+<tr><td><strong>A.2</strong> (config_system)</td><td>RAM libre ≥ baseline - 2KB</td><td>Verificar si config_system.py carga código no usado; evaluar split</td></tr>
+<tr><td><strong>A.3</strong> (config_fase3)</td><td>RAM libre ≥ baseline - 1KB</td><td>Mantener ConfigFase3 en fichero separado si crece demasiado</td></tr>
+<tr><td><strong>A.4</strong> (email_state)</td><td>RAM libre ≥ baseline - 1KB</td><td>Revertir, email_state.py no era tan pequeño en bytecode</td></tr>
+<tr><td><strong>B.1</strong> (emails→alertas)</td><td>RAM no empeora > 1KB vs baseline</td><td>alertas.py puede crecer mucho; evaluar si justifica</td></tr>
+<tr><td><strong>C.1+C.2+C.3</strong> (ITV+PRG)</td><td>RAM no empeora > 1KB vs baseline</td><td>placa.py crece pero elimina duplicados; debería ser neutro</td></tr>
+<tr><td><strong>D.1</strong> (zona horaria)</td><td>RAM no empeora > 500 bytes</td><td>Movimiento de función pura; impacto casi nulo</td></tr>
+<tr><td><strong>F</strong> (fase3_utils)</td><td>RAM libre ≥ baseline - 1KB</td><td>Funciones migradas a logger.py/fase3.py; debería ser neutro o positivo</td></tr>
+<tr><td><strong>G</strong> (limpieza)</td><td>RAM libre ≥ baseline - 500 bytes</td><td>Eliminar imports no debería cambiar RAM; si baja, revisar imports residuales</td></tr>
+</table>
+</div>
+
+<div class="callout callout-warn">
+  <strong>⚠️ Regla de aborto:</strong> Si tras cualquier fusión A.1-A.4 la RAM libre baja más de 2KB respecto al baseline, <strong>revertir inmediatamente</strong>. En MicroPython, menos ficheros no siempre significa menos RAM. El objetivo es estabilidad, no estética.
+</div>
+
+<h3>17.4 Registro de mediciones</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fase</th><th>RAM antes (bytes)</th><th>RAM después (bytes)</th><th>Δ</th><th>¿Aceptar?</th></tr>
+<tr><td>Baseline (pre-refactor, fase3 activa)</td><td class="num">________</td><td class="num">—</td><td class="num">—</td><td>—</td></tr>
+<tr><td>A.1 radio_base→radio_manager</td><td class="num">________</td><td class="num">________</td><td class="num">________</td><td>☐</td></tr>
+<tr><td>A.2 estado+config→config_system</td><td class="num">________</td><td class="num">________</td><td class="num">________</td><td>☐</td></tr>
+<tr><td>A.3 config_fase3→config_system</td><td class="num">________</td><td class="num">________</td><td class="num">________</td><td>☐</td></tr>
+<tr><td>A.4 email_state→alertas</td><td class="num">________</td><td class="num">________</td><td class="num">________</td><td>☐</td></tr>
+<tr><td>B.1 emails→alertas</td><td class="num">________</td><td class="num">________</td><td class="num">________</td><td>☐</td></tr>
+<tr><td>C.1+C.2+C.3 ITV+PRG</td><td class="num">________</td><td class="num">________</td><td class="num">________</td><td>☐</td></tr>
+<tr><td>D.1 zona horaria</td><td class="num">________</td><td class="num">________</td><td class="num">________</td><td>☐</td></tr>
+<tr><td>F fase3_utils</td><td class="num">________</td><td class="num">________</td><td class="num">________</td><td>☐</td></tr>
+<tr><td>G limpieza imports</td><td class="num">________</td><td class="num">________</td><td class="num">________</td><td>☐</td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<div class="footer">
+  <p>Informe generado el 22 de julio de 2026 para ITV LEO v7.5.1 — <strong>Revisión 2.1</strong></p>
+  <p>Próximo paso crítico: <strong>Subir placa al techo + antena ajustada a 431 MHz</strong></p>
+  <p>No ejecutar refactorización hasta validar 24-48h de estabilidad en campo</p>
+  <p><em>Parte 4 de 4 — Documento completo</em></p>
+</div>
+
+</div>
+</body>
+</html>

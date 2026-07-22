@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe de Refactorización ITV LEO v7.5.1 — Parte 1/4</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --bg3: #21262d;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text2: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #1f6feb;
+  --green: #3fb950;
+  --yellow: #d29922;
+  --red: #f85149;
+  --orange: #f0883e;
+  --purple: #bc8cff;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+h1 { color: var(--accent); border-bottom: 2px solid var(--accent2); padding-bottom: 12px; margin-top: 0; }
+h2 { color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-top: 40px; }
+h3 { color: var(--purple); margin-top: 28px; }
+h4 { color: var(--yellow); margin-top: 20px; }
+.meta { color: var(--text2); font-size: 0.9em; margin-bottom: 24px; }
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.badge-min { background: #238636; color: #fff; }
+.badge-low { background: #1f6feb; color: #fff; }
+.badge-med { background: #d29922; color: #000; }
+.badge-high { background: #f85149; color: #fff; }
+.badge-done { background: #3fb950; color: #000; }
+.badge-wait { background: #6e7681; color: #fff; }
+.badge-ok { background: #238636; color: #fff; }
+.badge-warn { background: #d29922; color: #000; }
+.badge-err { background: #f85149; color: #fff; }
+.badge-new { background: #bc8cff; color: #000; }
+
+.callout {
+  border-left: 4px solid var(--accent);
+  background: var(--bg2);
+  padding: 16px 20px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+}
+.callout-warn { border-left-color: var(--yellow); }
+.callout-err { border-left-color: var(--red); }
+.callout-green { border-left-color: var(--green); }
+.callout-new { border-left-color: var(--purple); }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  background: var(--bg2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+th, td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  background: var(--bg3);
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+tr:hover { background: rgba(88,166,255,0.05); }
+td.num { text-align: right; font-family: monospace; }
+
+.toc {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.toc ul { margin: 8px 0; padding-left: 20px; }
+.toc li { margin: 4px 0; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+
+.code {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+  font-size: 0.85em;
+  overflow-x: auto;
+  margin: 12px 0;
+  color: #e6edf3;
+}
+.code .comment { color: #8b949e; }
+.code .keyword { color: #ff7b72; }
+.code .string { color: #a5d6ff; }
+.code .func { color: #d2a8ff; }
+
+.step {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.step-num {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--accent2);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.1em;
+  flex-shrink: 0;
+}
+.step-title { font-size: 1.15em; font-weight: 600; color: var(--accent); }
+
+.dependency-graph {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  font-family: monospace;
+  font-size: 0.85em;
+  line-height: 1.8;
+  overflow-x: auto;
+}
+.dependency-graph .file { color: var(--accent); }
+.dependency-graph .import { color: var(--yellow); }
+.dependency-graph .circular { color: var(--red); font-weight: bold; }
+.dependency-graph .note { color: var(--text2); }
+
+.footer {
+  margin-top: 60px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 0.85em;
+  text-align: center;
+}
+
+.revision-box {
+  background: var(--bg2);
+  border: 2px solid var(--purple);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.revision-box h3 { color: var(--purple); margin-top: 0; }
+.revision-box ul { margin: 8px 0; padding-left: 20px; }
+.revision-box li { margin: 6px 0; }
+
+.ram-check {
+  background: var(--bg3);
+  border: 1px dashed var(--green);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.nav-parts {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin: 20px 0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.nav-parts .part-label { color: var(--text2); font-size: 0.85em; }
+.nav-parts .part-link {
+  color: var(--accent);
+  text-decoration: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--bg3);
+  font-size: 0.85em;
+}
+.nav-parts .part-link:hover { background: var(--border); }
+.nav-parts .part-link.active {
+  background: var(--accent2);
+  color: #fff;
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📡 Informe de Refactorización — ITV LEO v7.5.1</h1>
+<div class="meta">
+  Fecha: 22 de julio de 2026 &nbsp;|&nbsp; Estado: <span class="badge badge-wait">PRE-INSTALACIÓN</span> &nbsp;|&nbsp;
+  Revisión: <span class="badge badge-new">v2</span> &nbsp;|&nbsp;
+  Próximo paso crítico: <strong>Subir placa al techo + antena ajustada</strong>
+</div>
+
+<div class="callout callout-green">
+  <strong>⚠️ Regla de oro:</strong> No refactorizar hasta que la placa esté en el techo y validada 24-48h.
+  Este informe es el plan a ejecutar <em>después</em> de la estabilidad en campo confirmada.
+</div>
+
+<div class="nav-parts">
+  <span class="part-label">Partes del documento:</span>
+  <span class="part-link active">Parte 1: Introducción + Estado + Problemas</span>
+  <span class="part-link">Parte 2: Plan + Fase A (Fusiones)</span>
+  <span class="part-link">Parte 3: Fases B, C, D</span>
+  <span class="part-link">Parte 4: Fases E-G + Dependencias + Checklists</span>
+</div>
+
+<!-- ============================================================ -->
+<div class="revision-box">
+  <h3>📝 Revisiones aplicadas a este documento (v7.5.1-rev2)</h3>
+  <ul>
+    <li><strong>Orden de fases corregido:</strong> A.1 → A.2 → A.3 → A.4 (A.1 primero por ser independiente y servir de calibración)</li>
+    <li><strong>Limpieza de imports incremental añadida:</strong> Tras cada sub-fase, no al final. Evita ImportError que bloquea fases posteriores.</li>
+    <li><strong>C.3 corregido:</strong> <code>itv_manager.py</code> devuelve flag, <code>fase3.py</code> orquesta la transición (evita circular fase3→fase4)</li>
+    <li><strong>Checkpoint RAM añadido:</strong> Medición <code>gc.mem_free()</code> antes/después de cada fusión A.1-A.4</li>
+    <li><strong>Circular config_system.py ↔ logger.py:</strong> Identificado y resuelto — <code>config_system.py</code> no importa <code>logger.py</code></li>
+    <li><strong>Fase F completada:</strong> Análisis cruzado con <code>alertas.py</code> y <code>logger.py</code>. Tabla de destinos rellena con funciones reales.</li>
+    <li><strong><code>enviar_email_estado()</code> dividida:</strong> Rompe orquestación disfrazada de email. Persistencia → <code>logger.py</code>, orquestación → <code>fase3.py</code>.</li>
+    <li><strong><code>escribir_heartbeat_fase3()</code> eliminado:</strong> Wrapper redundante. <code>fase3.py</code> llama directamente a <code>logger.escribir_heartbeat()</code>.</li>
+    <li><strong>Dos funciones nuevas en <code>logger.py</code>:</strong> <code>leer_ultimos_heartbeats()</code> y <code>contar_capturas_pendientes()</code> (antes en <code>fase3_utils.py</code>).</li>
+    <li><strong>Principio de orquestación reforzado:</strong> Ningún "utils" ni "manager" llama <code>guardar_fase()</code>. Solo <code>fase*.py</code> orquesta.</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="toc">
+  <strong>📋 Tabla de contenidos — Parte 1/4</strong>
+  <ul>
+    <li><a href="#principios">0. Principios Rectores</a></li>
+    <li><a href="#resumen-ejecutivo">1. Resumen Ejecutivo</a></li>
+    <li><a href="#estado-actual">2. Estado Actual del Proyecto</a></li>
+    <li><a href="#problemas">3. Problemas Arquitecturales Detectados</a></li>
+  </ul>
+  <p style="color: var(--text2); font-size: 0.85em; margin-top: 12px;">
+    <em>Continúa en Parte 2: Plan por Fases + Fase A (Fusiones)</em>
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="principios">0. Principios Rectores</h2>
+
+<ol>
+  <li><strong>A.1 primero</strong> — Es la fusión más segura (independiente), sirve para calibrar el proceso de medición de RAM.</li>
+  <li><strong>Limpieza de imports incremental</strong> — Tras cada sub-fase, no al final. Evita <code>ImportError</code> que bloquearía fases posteriores.</li>
+  <li><strong><code>config_system.py</code> NO importa <code>logger.py</code></strong> — Mantiene la capa de configuración como módulo puro (lectura/escritura JSON).</li>
+  <li><strong>Orquestación solo en <code>fase*.py</code></strong> — Ningún "utils" ni "manager" llama <code>guardar_fase()</code>. El orquestador decide las transiciones.</li>
+  <li><strong>Rollback siempre disponible</strong> — Versiones anteriores guardadas. Si se rompe, se recupera.</li>
+  <li><strong>RAM sobre la marcha</strong> — Checkpoints de <code>gc.mem_free()</code> en cada fase, como hasta ahora.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="resumen-ejecutivo">1. Resumen Ejecutivo</h2>
+
+<p>El proyecto ITV LEO v7.5.1 funciona correctamente pero tiene <strong>desbalances arquitecturales</strong> que dificultan el mantenimiento:</p>
+
+<ul>
+  <li><strong>3 módulos gigantes</strong> (&gt;500 líneas) concentran demasiada lógica</li>
+  <li><strong>5 módulos micro</strong> (&lt;80 líneas) justifican su existencia por separado</li>
+  <li><strong>1 import circular</strong> confirmado: <code>tiempo.py</code> ↔ <code>datos_satelites.py</code></li>
+  <li><strong>Lógica duplicada</strong> de detección de botón PRG en <code>fase3.py</code> y <code>fase4.py</code></li>
+  <li><strong>Responsabilidades dispersas</strong> de email en 4 módulos distintos</li>
+  <li><strong>Potencial circular oculto</strong> <code>config_system.py</code> ↔ <code>logger.py</code> (ver §3.7)</li>
+  <li><strong><code>fase3_utils.py</code></strong> (350 líneas, categoría "Mezclado") — cajón de sastre sin fase propia en el plan original</li>
+</ul>
+
+<div class="callout">
+  <strong>Objetivo del plan:</strong> Reducir de 28 a ~22 módulos (o ~21 si A.3b se ejecuta), eliminar duplicaciones, romper imports circulares, y mejorar la cohesión sin perder la estabilidad en ESP32 + MicroPython.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="estado-actual">2. Estado Actual del Proyecto</h2>
+
+<h3>2.1 Inventario completo de ficheros</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fichero</th><th>Líneas ~</th><th>Tamaño (bytes)</th><th>Categoría</th><th>Estado</th></tr>
+<tr><td><code>sx126x.py</code></td><td class="num">1.500</td><td class="num">51.501</td><td>Biblioteca externa</td><td><span class="badge badge-ok">No tocar</span></td></tr>
+<tr><td><code>itv_manager.py</code></td><td class="num">700</td><td class="num">24.535</td><td>Negocio ITV</td><td><span class="badge badge-warn">Sobrecargado</span></td></tr>
+<tr><td><code>datos_satelites.py</code></td><td class="num">600</td><td class="num">21.651</td><td>Negocio + N2YO</td><td><span class="badge badge-warn">Sobrecargado</span></td></tr>
+<tr><td><code>test_tx_rx_cruzada.py</code></td><td class="num">600</td><td class="num">20.291</td><td>Test</td><td><span class="badge badge-ok">Ignorar</span></td></tr>
+<tr><td><code>fase4.py</code></td><td class="num">500</td><td class="num">18.211</td><td>Orquestación F4</td><td><span class="badge badge-err">Sobrecargado</span></td></tr>
+<tr><td><code>_sx126x.py</code></td><td class="num">500</td><td class="num">16.173</td><td>Biblioteca externa</td><td><span class="badge badge-ok">No tocar</span></td></tr>
+<tr><td><code>fase3.py</code></td><td class="num">400</td><td class="num">15.326</td><td>Orquestación F3</td><td><span class="badge badge-ok">Correcto</span></td></tr>
+<tr><td><code>fase3_utils.py</code></td><td class="num">350</td><td class="num">12.197</td><td>Auxiliares F3 / Mezclado</td><td><span class="badge badge-err">Cajón de sastre</span></td></tr>
+<tr><td><code>alertas.py</code></td><td class="num">300</td><td class="num">11.284</td><td>Email SMTP</td><td><span class="badge badge-warn">Sobrecargado</span></td></tr>
+<tr><td><code>logger.py</code></td><td class="num">300</td><td class="num">10.941</td><td>Logging + persistencia</td><td><span class="badge badge-warn">Sobrecargado</span></td></tr>
+<tr><td><code>radio_manager.py</code></td><td class="num">280</td><td class="num">9.085</td><td>Radio SX1262</td><td><span class="badge badge-ok">Correcto</span></td></tr>
+<tr><td><code>sx1262.py</code></td><td class="num">280</td><td class="num">9.184</td><td>Driver radio</td><td><span class="badge badge-ok">No tocar</span></td></tr>
+<tr><td><code>agenda.json</code></td><td class="num">—</td><td class="num">6.465</td><td>Datos</td><td><span class="badge badge-ok">Datos</span></td></tr>
+<tr><td><code>config.json</code></td><td class="num">—</td><td class="num">6.885</td><td>Configuración</td><td><span class="badge badge-ok">Datos</span></td></tr>
+<tr><td><code>placa.py</code></td><td class="num">200</td><td class="num">6.815</td><td>Abstracción HW</td><td><span class="badge badge-ok">Excelente</span></td></tr>
+<tr><td><code>diagnostico_placa.py</code></td><td class="num">200</td><td class="num">6.736</td><td>Diagnóstico</td><td><span class="badge badge-ok">Correcto</span></td></tr>
+<tr><td><code>doppler_motor.py</code></td><td class="num">160</td><td class="num">5.293</td><td>Cálculo Doppler</td><td><span class="badge badge-ok">Correcto</span></td></tr>
+<tr><td><code>fase1.py</code></td><td class="num">130</td><td class="num">4.301</td><td>Sincronización</td><td><span class="badge badge-ok">Correcto</span></td></tr>
+<tr><td><code>fase2.py</code></td><td class="num">140</td><td class="num">4.455</td><td>Reporte diario</td><td><span class="badge badge-ok">Correcto</span></td></tr>
+<tr><td><code>sat_identifier.py</code></td><td class="num">140</td><td class="num">4.604</td><td>Identificación sat</td><td><span class="badge badge-ok">Correcto</span></td></tr>
+<tr><td><code>config_fase3.py</code></td><td class="num">100</td><td class="num">2.955</td><td>Cache config F3</td><td><span class="badge badge-warn">¿Fusionable?</span></td></tr>
+<tr><td><code>email_state.py</code></td><td class="num">90</td><td class="num">2.944</td><td>Horas email</td><td><span class="badge badge-warn">¿Fusionable?</span></td></tr>
+<tr><td><code>red.py</code></td><td class="num">90</td><td class="num">3.158</td><td>WiFi + NTP</td><td><span class="badge badge-ok">Correcto</span></td></tr>
+<tr><td><code>tiempo.py</code></td><td class="num">90</td><td class="num">3.111</td><td>Tiempo UTC/local</td><td><span class="badge badge-err">Circular</span></td></tr>
+<tr><td><code>sweep_params.py</code></td><td class="num">80</td><td class="num">2.591</td><td>Parámetros sweep</td><td><span class="badge badge-ok">Correcto</span></td></tr>
+<tr><td><code>estado.py</code></td><td class="num">60</td><td class="num">1.749</td><td>Estado.json</td><td><span class="badge badge-warn">Muy pequeño</span></td></tr>
+<tr><td><code>configuracion.py</code></td><td class="num">50</td><td class="num">1.275</td><td>Config global</td><td><span class="badge badge-warn">Muy pequeño</span></td></tr>
+<tr><td><code>main.py</code></td><td class="num">20</td><td class="num">525</td><td>Entry point</td><td><span class="badge badge-ok">Perfecto</span></td></tr>
+<tr><td><code>boot.py</code></td><td class="num">30</td><td class="num">402</td><td>Boot</td><td><span class="badge badge-ok">Correcto</span></td></tr>
+<tr><td><code>radio_base.py</code></td><td class="num">30</td><td class="num">889</td><td>Base radio</td><td><span class="badge badge-err">Muy pequeño</span></td></tr>
+</table>
+</div>
+
+<h3>2.2 Balance de responsabilidades</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Responsabilidad</th><th>Módulos involucrados</th><th>Problema</th></tr>
+<tr><td>Envío de emails</td><td><code>alertas.py</code>, <code>fase4.py</code>, <code>email_state.py</code>, <code>fase3_utils.py</code></td><td><span class="badge badge-err">Disperso</span></td></tr>
+<tr><td>Estado / ITV / PRG</td><td><code>fase4.py</code>, <code>itv_manager.py</code>, <code>estado.py</code>, <code>fase3.py</code></td><td><span class="badge badge-err">Disperso</span></td></tr>
+<tr><td>Configuración</td><td><code>config.json</code>, <code>configuracion.py</code>, <code>config_fase3.py</code>, <code>sweep_params.py</code></td><td><span class="badge badge-warn">Disperso</span></td></tr>
+<tr><td>Tiempo / zona horaria</td><td><code>tiempo.py</code>, <code>datos_satelites.py</code></td><td><span class="badge badge-err">Circular</span></td></tr>
+<tr><td>Radio / LoRa</td><td><code>radio_base.py</code>, <code>radio_manager.py</code>, <code>sx1262.py</code>, <code>sx126x.py</code></td><td><span class="badge badge-warn">4 módulos</span></td></tr>
+<tr><td>Persistencia ficheros</td><td><code>logger.py</code> (10 funciones), <code>fase3_utils.py</code>, <code>fase4.py</code></td><td><span class="badge badge-warn">Disperso</span></td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="problemas">3. Problemas Arquitecturales Detectados</h2>
+
+<h3>3.1 P1: Desequilibrio extremo de tamaños</h3>
+<p>Los 3 módulos más grandes de negocio suman <strong>1.800 líneas</strong>. Los 3 más pequeños suman <strong>140 líneas</strong>.</p>
+
+<div class="callout callout-warn">
+  <strong>Impacto:</strong> Módulos grandes son difíciles de testear y mantener. Módulos pequeños generan overhead de imports en MicroPython (RAM).
+</div>
+
+<h3>3.2 P2: <code>fase4.py</code> sobrecargado (4 responsabilidades)</h3>
+<ol>
+  <li><strong>Orquestación</strong> del envío de estado (loop principal de fase 4)</li>
+  <li><strong>Construcción de emails</strong> (estado + capturas fragmentadas)</li>
+  <li><strong>Envío de ITV</strong> (construcción manual del cuerpo del email ITV)</li>
+  <li><strong>Detección PRG</strong> (confirmación ITV por botón)</li>
+</ol>
+
+<h3>3.3 P3: <code>itv_manager.py</code> mezcla métricas + email + PRG</h3>
+<p>La clase <code>ITVManager</code> hace:</p>
+<ul>
+  <li>✅ Acumulación de métricas (correcto)</li>
+  <li>✅ Evaluación de triggers ITV (correcto)</li>
+  <li>❌ Preparación de email ITV (debería estar en <code>alertas.py</code>)</li>
+  <li>❌ Forzar transición a fase4 (debería estar en <code>fase3.py</code>, el orquestador)</li>
+</ul>
+
+<h3>3.4 P4: Lógica de detección PRG duplicada</h3>
+<p>Exactamente el mismo algoritmo de 3 pulsaciones en 5 segundos está en:</p>
+<ul>
+  <li><code>fase3.py</code> — <code>_comprobar_prg()</code> (50 líneas)</li>
+  <li><code>fase4.py</code> — <code>_detectar_confirmacion_itv_prg()</code> (50 líneas)</li>
+</ul>
+
+<h3>3.5 P5: Import circular <code>tiempo.py</code> ↔ <code>datos_satelites.py</code></h3>
+<div class="code">
+<span class="comment"># tiempo.py necesita datos_satelites para obtener_desfase_espana()</span>
+<span class="keyword">import</span> datos_satelites
+desfase = datos_satelites.<span class="func">obtener_desfase_espana</span>(unix_local)
+
+<span class="comment"># datos_satelites.py necesita tiempo para obtener_tiempo_actual()</span>
+<span class="keyword">from</span> tiempo <span class="keyword">import</span> obtener_tiempo_actual
+utc_unix, _, t_local = <span class="func">obtener_tiempo_actual</span>()
+</div>
+
+<p>Truco actual: imports <em>lazy</em> dentro de funciones. Funciona pero es frágil.</p>
+
+<h3>3.6 P6: <code>logger.py</code> hace de "todo-ficheros"</h3>
+<p>Contiene 10 funciones de lectura/escritura de ficheros que no son "logging":</p>
+<ul>
+  <li><code>escribir_captura()</code>, <code>leer_todas_las_capturas()</code>, <code>borrar_capturas()</code>, <code>hay_capturas_pendientes()</code></li>
+  <li><code>leer_logs_pendientes()</code>, <code>guardar_logs()</code>, <code>guardar_para_reintento()</code></li>
+  <li><code>leer_estado_pendiente()</code>, <code>borrar_estado_pendiente()</code></li>
+  <li><code>escribir_heartbeat()</code>, <code>rotar_logs_txt()</code>, <code>leer_archivo_texto()</code>, <code>leer_errores_para_email()</code></li>
+</ul>
+
+<h3>3.7 P7: Potencial circular <code>config_system.py</code> ↔ <code>logger.py</code></h3>
+<div class="callout callout-err">
+  <strong>Problema identificado:</strong> Si <code>configuracion.py</code> o <code>estado.py</code> importan actualmente <code>logger.py</code> (para <code>log_error</code>), y <code>logger.py</code> importa <code>configuracion.py</code> o <code>estado.py</code> (para leer config o estado), la fusión A.2 agruparía ese circular en <code>config_system.py</code> ↔ <code>logger.py</code>.
+</div>
+
+<p><strong>Solución:</strong> <code>config_system.py</code> <strong>no importará <code>logger.py</code></strong>. Las funciones de config/estado lanzan excepciones en caso de error; el llamador (ej. <code>main.py</code>, <code>fase3.py</code>) captura y loguea. Esto mantiene <code>config_system.py</code> como módulo puro de lectura/escritura JSON.</p>
+
+<h3>3.8 P8: <code>fase3_utils.py</code> — cajón de sastre sin fase propia</h3>
+<p>350 líneas, categoría "Mezclado", involucrado en persistencia, email y utilidades varias. El plan original lo mencionaba 5 veces pero nunca le dedicaba una fase de refactorización.</p>
+
+<div class="callout callout-new">
+  <strong>🆕 Análisis cruzado completado:</strong> Tras revisar <code>alertas.py</code> y <code>logger.py</code>, se ha determinado que:
+  <ul>
+    <li><code>alertas.py</code> actualmente solo sabe <strong>enviar</strong> emails (SMTP). No construye cuerpos de estado ni capturas — esas funciones están en <code>fase4.py</code>.</li>
+    <li><code>logger.py</code> absorberá dos funciones nuevas de <code>fase3_utils.py</code>: <code>leer_ultimos_heartbeats()</code> y <code>contar_capturas_pendientes()</code>.</li>
+    <li><code>escribir_heartbeat_fase3()</code> es un <strong>wrapper redundante</strong> — se elimina.</li>
+    <li><code>enviar_email_estado()</code> mezcla 3 responsabilidades (persistencia, email, orquestación) y debe <strong>dividirse</strong>.</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="footer">
+  <p>Informe generado el 22 de julio de 2026 para ITV LEO v7.5.1 — <strong>Revisión 2</strong></p>
+  <p>Próximo paso crítico: <strong>Subir placa al techo + antena ajustada a 431 MHz</strong></p>
+  <p>No ejecutar refactorización hasta validar 24-48h de estabilidad en campo</p>
+  <p><em>Parte 1 de 4 — Continúa en Parte 2: Plan por Fases + Fase A (Fusiones)</em></p>
+</div>
+
+</div>
+</body>
+</html>

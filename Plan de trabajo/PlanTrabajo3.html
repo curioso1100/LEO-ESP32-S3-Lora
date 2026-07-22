@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe de Refactorización ITV LEO v7.5.1 — Parte 3/4</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --bg3: #21262d;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text2: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #1f6feb;
+  --green: #3fb950;
+  --yellow: #d29922;
+  --red: #f85149;
+  --orange: #f0883e;
+  --purple: #bc8cff;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+h1 { color: var(--accent); border-bottom: 2px solid var(--accent2); padding-bottom: 12px; margin-top: 0; }
+h2 { color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-top: 40px; }
+h3 { color: var(--purple); margin-top: 28px; }
+h4 { color: var(--yellow); margin-top: 20px; }
+.meta { color: var(--text2); font-size: 0.9em; margin-bottom: 24px; }
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.badge-min { background: #238636; color: #fff; }
+.badge-low { background: #1f6feb; color: #fff; }
+.badge-med { background: #d29922; color: #000; }
+.badge-high { background: #f85149; color: #fff; }
+.badge-done { background: #3fb950; color: #000; }
+.badge-wait { background: #6e7681; color: #fff; }
+.badge-ok { background: #238636; color: #fff; }
+.badge-warn { background: #d29922; color: #000; }
+.badge-err { background: #f85149; color: #fff; }
+.badge-new { background: #bc8cff; color: #000; }
+
+.callout {
+  border-left: 4px solid var(--accent);
+  background: var(--bg2);
+  padding: 16px 20px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+}
+.callout-warn { border-left-color: var(--yellow); }
+.callout-err { border-left-color: var(--red); }
+.callout-green { border-left-color: var(--green); }
+.callout-new { border-left-color: var(--purple); }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  background: var(--bg2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+th, td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  background: var(--bg3);
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+tr:hover { background: rgba(88,166,255,0.05); }
+td.num { text-align: right; font-family: monospace; }
+
+.toc {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.toc ul { margin: 8px 0; padding-left: 20px; }
+.toc li { margin: 4px 0; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+
+.code {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+  font-size: 0.85em;
+  overflow-x: auto;
+  margin: 12px 0;
+  color: #e6edf3;
+}
+.code .comment { color: #8b949e; }
+.code .keyword { color: #ff7b72; }
+.code .string { color: #a5d6ff; }
+.code .func { color: #d2a8ff; }
+
+.step {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.step-num {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--accent2);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.1em;
+  flex-shrink: 0;
+}
+.step-title { font-size: 1.15em; font-weight: 600; color: var(--accent); }
+
+.dependency-graph {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  font-family: monospace;
+  font-size: 0.85em;
+  line-height: 1.8;
+  overflow-x: auto;
+}
+.dependency-graph .file { color: var(--accent); }
+.dependency-graph .import { color: var(--yellow); }
+.dependency-graph .circular { color: var(--red); font-weight: bold; }
+.dependency-graph .note { color: var(--text2); }
+
+.footer {
+  margin-top: 60px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 0.85em;
+  text-align: center;
+}
+
+.revision-box {
+  background: var(--bg2);
+  border: 2px solid var(--purple);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.revision-box h3 { color: var(--purple); margin-top: 0; }
+.revision-box ul { margin: 8px 0; padding-left: 20px; }
+.revision-box li { margin: 6px 0; }
+
+.ram-check {
+  background: var(--bg3);
+  border: 1px dashed var(--green);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.nav-parts {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin: 20px 0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.nav-parts .part-label { color: var(--text2); font-size: 0.85em; }
+.nav-parts .part-link {
+  color: var(--accent);
+  text-decoration: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--bg3);
+  font-size: 0.85em;
+}
+.nav-parts .part-link:hover { background: var(--border); }
+.nav-parts .part-link.active {
+  background: var(--accent2);
+  color: #fff;
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📡 Informe de Refactorización — ITV LEO v7.5.1</h1>
+<div class="meta">
+  Fecha: 22 de julio de 2026 &nbsp;|&nbsp; Estado: <span class="badge badge-wait">PRE-INSTALACIÓN</span> &nbsp;|&nbsp;
+  Revisión: <span class="badge badge-new">v2</span> &nbsp;|&nbsp;
+  Próximo paso crítico: <strong>Subir placa al techo + antena ajustada</strong>
+</div>
+
+<div class="nav-parts">
+  <span class="part-label">Partes del documento:</span>
+  <span class="part-link">Parte 1: Introducción + Estado + Problemas</span>
+  <span class="part-link">Parte 2: Plan + Fase A (Fusiones)</span>
+  <span class="part-link active">Parte 3: Fases B, C, D</span>
+  <span class="part-link">Parte 4: Fases E-G + Dependencias + Checklists</span>
+</div>
+
+<!-- ============================================================ -->
+<div class="toc">
+  <strong>📋 Tabla de contenidos — Parte 3/4</strong>
+  <ul>
+    <li><a href="#fase-b">8. Fase B — Desacoplar fase4.py</a></li>
+    <li><a href="#fase-c">9. Fase C — Reorganizar ITV Manager</a></li>
+    <li><a href="#fase-d">10. Fase D — Reorganizar Datos Satélites</a></li>
+  </ul>
+  <p style="color: var(--text2); font-size: 0.85em; margin-top: 12px;">
+    <em>Continúa en Parte 4: Fases E-G + Mapa de Dependencias + Checklists</em>
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="fase-b">8. Fase B — Desacoplar <code>fase4.py</code> <span class="badge badge-med">Riesgo Medio</span></h2>
+
+<h3>B.1: Mover construcción de emails a <code>alertas.py</code></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">B1</div>
+    <div class="step-title">Construcción de emails → alertas.py</div>
+  </div>
+  <p><strong>Motivo:</strong> <code>fase4.py</code> tiene 3 funciones de construcción de cuerpos de email que no son orquestación.</p>
+  <p><strong>Funciones a mover:</strong></p>
+  <ul>
+    <li><code>_construir_email_estado()</code> — 60 líneas</li>
+    <li><code>_construir_email_capturas()</code> — 15 líneas</li>
+    <li><code>_enviar_email_smtp()</code> — 10 líneas (pasamanos, eliminar)</li>
+  </ul>
+  <p><strong>Nuevas funciones en <code>alertas.py</code>:</strong></p>
+  <div class="code">
+<span class="keyword">def</span> <span class="func">construir_email_estado</span>(heartbeats, num_hb, base_count, pase_count,
+                             temp_cpu, ventilador_on, fs_libre_kb, errores,
+                             paquetes_capturados=0, paquetes_descartados=0,
+                             horas_pendientes=<span class="keyword">None</span>): ...
+
+<span class="keyword">def</span> <span class="func">construir_email_capturas</span>(trozo_capturas, num_trozo, total_trozos,
+                               num_cap_total, linea_inicio, linea_fin): ...
+  </div>
+  <p><strong>Impacto:</strong> <code>fase4.py</code> pasa de ~500 a ~420 líneas. <code>alertas.py</code> gana cohesión.</p>
+
+<div class="callout callout-green">
+  <strong>Consistencia con C.1:</strong> <code>alertas.py</code> también recibirá <code>construir_email_itv()</code> y <code>enviar_email_itv()</code> (ver Fase C.1). Así centraliza <strong>todo</strong> lo de email: estado, capturas, ITV, reporte diario. <code>itv_manager.py</code> solo prepara datos, nunca construye emails.
+</div>
+</div>
+
+<h3>B.2: Mover fragmentación de capturas a <code>datos_satelites.py</code> o utilidad</h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">B2</div>
+    <div class="step-title">_fragmentar_capturas() → datos_satelites.py</div>
+  </div>
+  <p><strong>Motivo:</strong> Es una función pura de utilidad (no depende de estado del sistema). <code>datos_satelites.py</code> ya procesa datos.</p>
+  <p><strong>Veredicto:</strong> <span class="badge badge-wait">Opcional</span> — bajo impacto, dejar para último.</p>
+</div>
+
+<h3>Limpieza de imports tras B</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fichero afectado</th><th>Cambio</th></tr>
+<tr><td><code>fase4.py</code></td><td>Eliminar funciones movidas, ajustar llamadas a <code>alertas.construir_email_*()</code></td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="fase-c">9. Fase C — Reorganizar <code>itv_manager.py</code> <span class="badge badge-med">Riesgo Medio</span></h2>
+
+<h3>C.1: Mover preparación de datos ITV de <code>fase4.py</code> → <code>itv_manager.py</code>; envío a <code>alertas.py</code></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">C1</div>
+    <div class="step-title">Datos ITV → itv_manager.py; Construcción+Envío ITV → alertas.py</div>
+  </div>
+  <p><strong>Motivo:</strong> <code>fase4.py</code> actualmente construye manualmente el cuerpo del email ITV (140 líneas) leyendo JSON de <code>itv_manager.py</code>. Esto dispersa la lógica de email en tres sitios: <code>alertas.py</code> (SMTP), <code>fase4.py</code> (construcción ITV), <code>itv_manager.py</code> (preparación JSON). La intención de B.1 es centralizar <strong>todo</strong> lo relacionado con emails en <code>alertas.py</code>.</p>
+  <p><strong>Acción:</strong></p>
+  <ol>
+    <li><code>itv_manager.py</code>: Mantiene <code>_preparar_email_itv()</code> (ya existe). Añade método <code>obtener_datos_email_itv()</code> que devuelve dict con métricas, motivos, checklist, acciones, días — listo para consumir.</li>
+    <li><code>alertas.py</code>: Añade <code>construir_email_itv(datos_itv)</code> que recibe el dict y construye el cuerpo del email (las 140 líneas actuales de <code>fase4.py</code>). Añade <code>enviar_email_itv(datos_itv, debug_activo)</code> que construye + envía vía <code>enviar_correo_bloques()</code>.</li>
+    <li><code>fase4.py</code>: Solo orquesta: <code>if itv.hay_email_itv_pendiente(): alertas.enviar_email_itv(itv.obtener_datos_email_itv(), DEBUG_MODO)</code></li>
+  </ol>
+  <p><strong>Impacto:</strong> <code>fase4.py</code> pasa de ~420 a ~280 líneas. <code>alertas.py</code> centraliza <strong>todo</strong> lo de email (estado, capturas, ITV, reporte diario). <code>itv_manager.py</code> se enfoca en métricas y triggers.</p>
+  <div class="callout callout-green">
+    <strong>Principio:</strong> <code>alertas.py</code> = fábrica de emails + envío SMTP. <code>itv_manager.py</code> = lógica de negocio ITV (métricas, triggers, reset). <code>fase4.py</code> = orquestador puro.
+  </div>
+</div>
+
+<h3>C.2: Unificar detección PRG en <code>placa.py</code></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">C2</div>
+    <div class="step-title">PRG unificado → placa.py</div>
+  </div>
+  <p><strong>Motivo:</strong> La misma lógica de 3 pulsaciones en 5 segundos está duplicada en <code>fase3.py</code> y <code>fase4.py</code>. <code>placa.py</code> ya tiene <code>prg_pulsado()</code> y <code>led_blink()</code>.</p>
+  <p><strong>Acción:</strong> Añadir a <code>placa.py</code>:</p>
+  <div class="code">
+<span class="keyword">def</span> <span class="func">detectar_pulsacion_prg</span>(pulsaciones_objetivo=3, ventana_ms=5000, max_duracion_ms=1000):
+    <span class="string">"""Detecta N pulsaciones cortas de PRG dentro de una ventana de tiempo."""</span>
+    <span class="keyword">if not</span> prg_pulsado():
+        <span class="keyword">return False</span>
+    pulsaciones = 1
+    t_inicio = time.ticks_ms()
+    <span class="keyword">while</span> prg_pulsado():
+        time.sleep_ms(50)
+    <span class="keyword">if</span> time.ticks_diff(time.ticks_ms(), t_inicio) > max_duracion_ms:
+        <span class="keyword">return False</span>
+    <span class="keyword">while</span> time.ticks_diff(time.ticks_ms(), t_inicio) < ventana_ms:
+        <span class="keyword">if</span> prg_pulsado():
+            t_pulso = time.ticks_ms()
+            <span class="keyword">while</span> prg_pulsado():
+                time.sleep_ms(50)
+            <span class="keyword">if</span> time.ticks_diff(time.ticks_ms(), t_pulso) > max_duracion_ms:
+                pulsaciones = 0
+                <span class="keyword">continue</span>
+            pulsaciones += 1
+            <span class="keyword">if</span> pulsaciones >= pulsaciones_objetivo:
+                <span class="keyword">return True</span>
+        time.sleep_ms(50)
+    <span class="keyword">return False</span>
+  </div>
+  <p><strong>Actualizar:</strong></p>
+  <ul>
+    <li><code>fase3.py</code>: reemplazar <code>_comprobar_prg()</code> por <code>if placa.detectar_pulsacion_prg(): ...</code></li>
+    <li><code>fase4.py</code>: reemplazar <code>_detectar_confirmacion_itv_prg()</code> por <code>if placa.detectar_pulsacion_prg(): ...</code></li>
+  </ul>
+  <p><strong>Impacto:</strong> -80 líneas duplicadas. <strong>Validación:</strong> Probar PRG en fase3 y fase4.</p>
+</div>
+
+<h3>C.3: Mover forzar transición fase4 desde <code>itv_manager.py</code> <span class="badge badge-new">CORREGIDO</span></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">C3</div>
+    <div class="step-title">forzar_itv() → fase3.py (orquestador)</div>
+  </div>
+
+  <div class="callout callout-err">
+    <strong>Plan original (incorrecto):</strong> Mover <code>guardar_fase(4)</code> a <code>fase4.py</code>. Esto crearía un circular: <code>fase3.py</code> → <code>itv_manager.py</code> → <code>fase4.py</code> → ... (fase4 probablemente importa fase3 o itv_manager).
+  </div>
+
+  <div class="callout callout-green">
+    <strong>Solución corregida:</strong> <code>itv_manager.py</code> no sabe de fases. Solo marca <code>itv_pendiente = True</code> y devuelve un flag. <code>fase3.py</code> (el orquestador) lee el flag y ejecuta <code>guardar_fase(4)</code>.
+  </div>
+
+  <p><strong>Arquitectura corregida:</strong></p>
+  <div class="code">
+<span class="comment"># itv_manager.py — solo lógica de negocio, sin imports de fases</span>
+<span class="keyword">class</span> <span class="func">ITVManager</span>:
+    <span class="keyword">def</span> <span class="func">__init__</span>(self):
+        self.itv_pendiente = <span class="keyword">False</span>
+        ...
+
+    <span class="keyword">def</span> <span class="func">evaluar_trigger</span>(self):
+        <span class="string">"""Evalúa si se debe forzar ITV. Devuelve True si hay que transicionar."""</span>
+        <span class="keyword">if</span> self.dias_sin_itv >= self.umbral_dias:
+            self.itv_pendiente = <span class="keyword">True</span>
+            self.<span class="func">_crear_estado_pendiente_json</span>()  <span class="comment"># su responsabilidad: guardar su estado</span>
+            <span class="keyword">return True</span>
+        <span class="keyword">return False</span>
+
+    <span class="keyword">def</span> <span class="func">_crear_estado_pendiente_json</span>(self):
+        <span class="string">"""Guarda estado_pendiente.json para que fase4 lo lea."""</span>
+        <span class="comment"># No llama guardar_fase(4) — eso es orquestación</span>
+        ...
+
+<span class="comment"># fase3.py — orquestador, decide transiciones</span>
+<span class="keyword">from</span> config_system <span class="keyword">import</span> guardar_fase
+<span class="keyword">from</span> itv_manager <span class="keyword">import</span> ITVManager
+
+itv = ITVManager()
+<span class="comment"># ... en el loop principal ...</span>
+<span class="keyword">if</span> placa.detectar_pulsacion_prg() <span class="keyword">or</span> itv.evaluar_trigger():
+    guardar_fase(4)
+    <span class="keyword">return</span>  <span class="comment"># fase3 termina, main.py arranca fase4</span>
+  </div>
+
+  <p><strong>Beneficios de esta arquitectura:</strong></p>
+  <ul>
+    <li><code>itv_manager.py</code> no importa <code>config_system.py</code> para <code>guardar_fase</code> (evita circular)</li>
+    <li><code>itv_manager.py</code> no importa <code>fase4.py</code> (evita circular grave)</li>
+    <li><code>fase3.py</code> mantiene su rol de orquestador: decide cuándo transicionar</li>
+    <li>Testeable: se puede testear <code>itv_manager.evaluar_trigger()</code> sin cargar todo el sistema de fases</li>
+  </ul>
+
+  <p><strong>Impacto:</strong> <code>itv_manager.py</code> pierde la responsabilidad de orquestación. <code>fase3.py</code> gana una línea de transición. Sin circular.</p>
+
+  <h4>Punto de inserción en fase3.py</h4>
+  <div class="code">
+<span class="comment"># En fase3.py, en el loop principal, donde actualmente se evalúa PRG:</span>
+<span class="comment"># (sustituye la lógica duplicada _comprobar_prg() por placa.detectar_pulsacion_prg())</span>
+
+<span class="keyword">if</span> placa.detectar_pulsacion_prg() <span class="keyword">or</span> itv.evaluar_trigger():
+    guardar_fase(4)
+    <span class="keyword">return</span>  <span class="comment"># fase3 termina, main.py arranca fase4</span>
+  </div>
+
+  <p><strong>Nota:</strong> Este check se ejecuta <strong>en cada iteración del loop principal de fase3</strong>, justo después de procesar un paquete RX o durante el sleep entre pases. No debe ir dentro del procesamiento de un pase activo para evitar interrumpir una recepción en curso.</p>
+</div>
+
+<h3>Limpieza de imports tras C</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fichero afectado</th><th>Import a eliminar</th><th>Motivo</th></tr>
+<tr><td><code>fase3.py</code></td><td><code>def _comprobar_prg()</code></td><td>Reemplazada por <code>placa.detectar_pulsacion_prg()</code></td></tr>
+<tr><td><code>fase4.py</code></td><td><code>def _detectar_confirmacion_itv_prg()</code></td><td>Reemplazada por <code>placa.detectar_pulsacion_prg()</code></td></tr>
+<tr><td><code>itv_manager.py</code></td><td><code>from config_system import guardar_fase</code> (si existía)</td><td>Transición ahora en fase3.py</td></tr>
+<tr><td><code>itv_manager.py</code></td><td><code>import alertas</code> (si solo enviaba emails)</td><td>Emails ahora en alertas.py, itv_manager solo prepara datos</td></tr>
+<tr><td><code>fase4.py</code></td><td>Construcción manual de email ITV</td><td>Ahora en <code>alertas.construir_email_itv()</code></td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="fase-d">10. Fase D — Reorganizar <code>datos_satelites.py</code> <span class="badge badge-med">Riesgo Medio</span></h2>
+
+<h3>D.1: Extraer zona horaria → romper import circular</h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">D1</div>
+    <div class="step-title">obtener_desfase_espana() → tiempo.py</div>
+  </div>
+  <p><strong>Motivo:</strong> <code>obtener_desfase_espana()</code> es lógica pura de zona horaria (DST europeo). No tiene nada que ver con satélites. Es la causa del import circular.</p>
+  <p><strong>Acción:</strong></p>
+  <ol>
+    <li>Mover <code>obtener_desfase_espana()</code> y las constantes <code>_OFFSET_VERANO_S</code> / <code>_OFFSET_INVIERNO_S</code> de <code>datos_satelites.py</code> a <code>tiempo.py</code></li>
+    <li>En <code>datos_satelites.py</code>: cambiar <code>def obtener_desfase_espana(...)</code> por <code>from tiempo import obtener_desfase_espana</code></li>
+    <li>En <code>tiempo.py</code>: eliminar <code>import datos_satelites</code> y usar la función local</li>
+  </ol>
+  <div class="code">
+<span class="comment"># tiempo.py (añadir al inicio)</span>
+_OFFSET_VERANO_S = 7200
+_OFFSET_INVIERNO_S = 3600
+
+<span class="keyword">def</span> <span class="func">obtener_desfase_espana</span>(timestamp_utc): ...
+
+<span class="comment"># tiempo.py (modificar obtener_tiempo_actual)</span>
+<span class="keyword">def</span> <span class="func">obtener_tiempo_actual</span>():
+    <span class="comment"># Eliminar: import datos_satelites</span>
+    desfase = <span class="func">obtener_desfase_espana</span>(utc_unix)  <span class="comment"># función local</span>
+  </div>
+  <p><strong>Impacto:</strong> <span class="badge badge-ok" style="background:#238636;color:#fff;">Rompe circular</span>. <strong>Validación:</strong> Verificar hora local correcta en Thonny y en campo.</p>
+
+<div class="callout callout-green">
+  <strong>Beneficio colateral:</strong> <code>alertas.py</code> también usa <code>datos_satelites.obtener_desfase_espana()</code> para calcular hora local en emails de reporte diario. Tras mover la función a <code>tiempo.py</code>, <code>alertas.py</code> cambiará a <code>from tiempo import obtener_desfase_espana</code>, eliminando su dependencia de <code>datos_satelites.py</code>.
+</div>
+</div>
+
+<h3>D.2: Aislar N2YO como clase interna en <code>datos_satelites.py</code> <span class="badge badge-wait">POSPUESTO</span></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">D2</div>
+    <div class="step-title">N2YO como clase interna — NO nuevo módulo</div>
+  </div>
+  <p><strong>Motivo original:</strong> <code>descargar_agenda_completa()</code> es 250 líneas de HTTP + SSL + parsing + serialización. Si N2YO cambia la API, tocas <code>datos_satelites.py</code> que también calcula horas de estado y resuelve parámetros LoRa.</p>
+  <p><strong>Revisión:</strong> En MicroPython cada <code>.py</code> importado consume RAM. El plan A reduce de 28 a ~24 módulos. Crear <code>n2yo_client.py</code> devolvería a ~25. Si la API de N2YO es estable (lo es desde 2018), el beneficio es marginal frente al overhead de import.</p>
+  <p><strong>Acción revisada:</strong> <span class="badge badge-wait">NO crear nuevo módulo</span>. Opciones alternativas (evaluar post-A):</p>
+  <ol>
+    <li><strong>Clase interna</strong> <code>N2YOClient</code> dentro de <code>datos_satelites.py</code> — delimita la lógica HTTP sin nuevo fichero.</li>
+    <li><strong>Función con prefijo</strong> <code>_n2yo_</code> en <code>datos_satelites.py</code> — marca claramente el código de API externa.</li>
+    <li><strong>No hacer nada</strong> — si la API de N2YO sigue estable, el código funciona. Documentar con comentario <code># API N2YO - si cambia, solo tocar esta función</code>.</li>
+  </ol>
+  <p><strong>Veredicto:</strong> <span class="badge badge-wait">POSPUESTO</span> — aplicar opción 2 (prefijo <code>_n2yo_</code>) solo si se toca la función por otro motivo. No justifica refactorización dedicada.</p>
+</div>
+
+<h3>D.3: Mover lógica de horas de estado a <code>alertas.py</code></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">D3</div>
+    <div class="step-title">Horas estado → alertas.py</div>
+  </div>
+  <p><strong>Motivo:</strong> <code>_calcular_horas_estado_automaticas()</code>, <code>_guardar_config_con_horas_estado()</code> y <code>obtener_horas_pendientes_estado()</code> gestionan cuándo enviar emails de estado. Son lógica temporal de email.</p>
+
+  <div class="callout callout-new">
+    <strong>Precondición resuelta:</strong> Como A.2 y A.3 ya se ejecutaron, <code>alertas.py</code> ya tiene acceso a <code>config_system.py</code> para leer/escribir config. No hay conflicto de imports.
+  </div>
+
+  <p><strong>Acción:</strong> Tras A.3 (fusionar <code>email_state.py</code> en <code>alertas.py</code>), mover estas 3 funciones a <code>alertas.py</code>.</p>
+  <p><strong>Impacto:</strong> <code>datos_satelites.py</code> se enfoca en satélites + agenda. <code>alertas.py</code> gestiona todo lo de email.</p>
+</div>
+
+<h3>Limpieza de imports tras D</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fichero afectado</th><th>Cambio</th></tr>
+<tr><td><code>tiempo.py</code></td><td>Eliminar <code>import datos_satelites</code></td></tr>
+<tr><td><code>datos_satelites.py</code></td><td>Eliminar <code>def obtener_desfase_espana(...)</code>, añadir <code>from tiempo import obtener_desfase_espana</code></td></tr>
+<tr><td><code>fase1.py</code></td><td>Cambiar <code>import datos_satelites</code> → <code>from tiempo import obtener_desfase_espana</code> (si solo usaba desfase)</td></tr>
+<tr><td><code>alertas.py</code></td><td>Cambiar <code>datos_satelites.obtener_desfase_espana</code> → <code>tiempo.obtener_desfase_espana</code></td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<div class="footer">
+  <p>Informe generado el 22 de julio de 2026 para ITV LEO v7.5.1 — <strong>Revisión 2</strong></p>
+  <p>Próximo paso crítico: <strong>Subir placa al techo + antena ajustada a 431 MHz</strong></p>
+  <p>No ejecutar refactorización hasta validar 24-48h de estabilidad en campo</p>
+  <p><em>Parte 3 de 4 — Continúa en Parte 4: Fases E-G + Mapa de Dependencias + Checklists</em></p>
+</div>
+
+</div>
+</body>
+</html>

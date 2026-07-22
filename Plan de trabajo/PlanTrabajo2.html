@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe de Refactorización ITV LEO v7.5.1 — Parte 2/4</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --bg3: #21262d;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text2: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #1f6feb;
+  --green: #3fb950;
+  --yellow: #d29922;
+  --red: #f85149;
+  --orange: #f0883e;
+  --purple: #bc8cff;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+h1 { color: var(--accent); border-bottom: 2px solid var(--accent2); padding-bottom: 12px; margin-top: 0; }
+h2 { color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-top: 40px; }
+h3 { color: var(--purple); margin-top: 28px; }
+h4 { color: var(--yellow); margin-top: 20px; }
+.meta { color: var(--text2); font-size: 0.9em; margin-bottom: 24px; }
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.badge-min { background: #238636; color: #fff; }
+.badge-low { background: #1f6feb; color: #fff; }
+.badge-med { background: #d29922; color: #000; }
+.badge-high { background: #f85149; color: #fff; }
+.badge-done { background: #3fb950; color: #000; }
+.badge-wait { background: #6e7681; color: #fff; }
+.badge-ok { background: #238636; color: #fff; }
+.badge-warn { background: #d29922; color: #000; }
+.badge-err { background: #f85149; color: #fff; }
+.badge-new { background: #bc8cff; color: #000; }
+
+.callout {
+  border-left: 4px solid var(--accent);
+  background: var(--bg2);
+  padding: 16px 20px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+}
+.callout-warn { border-left-color: var(--yellow); }
+.callout-err { border-left-color: var(--red); }
+.callout-green { border-left-color: var(--green); }
+.callout-new { border-left-color: var(--purple); }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  background: var(--bg2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+th, td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  background: var(--bg3);
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+tr:hover { background: rgba(88,166,255,0.05); }
+td.num { text-align: right; font-family: monospace; }
+
+.toc {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.toc ul { margin: 8px 0; padding-left: 20px; }
+.toc li { margin: 4px 0; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+
+.code {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+  font-size: 0.85em;
+  overflow-x: auto;
+  margin: 12px 0;
+  color: #e6edf3;
+}
+.code .comment { color: #8b949e; }
+.code .keyword { color: #ff7b72; }
+.code .string { color: #a5d6ff; }
+.code .func { color: #d2a8ff; }
+
+.step {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.step-num {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--accent2);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.1em;
+  flex-shrink: 0;
+}
+.step-title { font-size: 1.15em; font-weight: 600; color: var(--accent); }
+
+.dependency-graph {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  font-family: monospace;
+  font-size: 0.85em;
+  line-height: 1.8;
+  overflow-x: auto;
+}
+.dependency-graph .file { color: var(--accent); }
+.dependency-graph .import { color: var(--yellow); }
+.dependency-graph .circular { color: var(--red); font-weight: bold; }
+.dependency-graph .note { color: var(--text2); }
+
+.footer {
+  margin-top: 60px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 0.85em;
+  text-align: center;
+}
+
+.revision-box {
+  background: var(--bg2);
+  border: 2px solid var(--purple);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.revision-box h3 { color: var(--purple); margin-top: 0; }
+.revision-box ul { margin: 8px 0; padding-left: 20px; }
+.revision-box li { margin: 6px 0; }
+
+.ram-check {
+  background: var(--bg3);
+  border: 1px dashed var(--green);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.nav-parts {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin: 20px 0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.nav-parts .part-label { color: var(--text2); font-size: 0.85em; }
+.nav-parts .part-link {
+  color: var(--accent);
+  text-decoration: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--bg3);
+  font-size: 0.85em;
+}
+.nav-parts .part-link:hover { background: var(--border); }
+.nav-parts .part-link.active {
+  background: var(--accent2);
+  color: #fff;
+  font-weight: 600;
+}
+
+.import-table {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📡 Informe de Refactorización — ITV LEO v7.5.1</h1>
+<div class="meta">
+  Fecha: 22 de julio de 2026 &nbsp;|&nbsp; Estado: <span class="badge badge-wait">PRE-INSTALACIÓN</span> &nbsp;|&nbsp;
+  Revisión: <span class="badge badge-new">v2</span> &nbsp;|&nbsp;
+  Próximo paso crítico: <strong>Subir placa al techo + antena ajustada</strong>
+</div>
+
+<div class="nav-parts">
+  <span class="part-label">Partes del documento:</span>
+  <span class="part-link">Parte 1: Introducción + Estado + Problemas</span>
+  <span class="part-link active">Parte 2: Plan + Fase A (Fusiones)</span>
+  <span class="part-link">Parte 3: Fases B, C, D</span>
+  <span class="part-link">Parte 4: Fases E-G + Dependencias + Checklists</span>
+</div>
+
+<!-- ============================================================ -->
+<div class="toc">
+  <strong>📋 Tabla de contenidos — Parte 2/4</strong>
+  <ul>
+    <li><a href="#secuencia">4. Secuencia de Ejecución</a></li>
+    <li><a href="#plan">5. Plan de Refactorización por Fases</a></li>
+    <li><a href="#fase-a">6. Fase A — Fusiones de Módulos Pequeños</a></li>
+    <li><a href="#limpieza-a">7. Limpieza de Imports Incremental (Fase A)</a></li>
+  </ul>
+  <p style="color: var(--text2); font-size: 0.85em; margin-top: 12px;">
+    <em>Continúa en Parte 3: Fases B, C, D</em>
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="secuencia">4. Secuencia de Ejecución</h2>
+
+<div class="dependency-graph">
+A.1 (radio) → limpiar imports → validar RAM
+  ↓
+A.2 (config_system) → limpiar imports → validar RAM
+  ↓
+A.3 (config_fase3) → limpiar imports → validar RAM
+  ↓
+A.4 (email_state) → limpiar imports → validar RAM
+  ↓
+B.1 (emails→alertas) → limpiar imports → validar
+  ↓
+C.1 → C.2 → C.3 (ITV+PRG) → limpiar imports → validar
+  ↓
+D.1 → D.3 (zona horaria+horas estado) → limpiar imports → validar
+  ↓
+F (fase3_utils) → limpiar imports → validar
+  ↓
+G final (revisión global de imports muertos)
+</div>
+
+<div class="callout callout-green">
+  <strong>Prioridad general:</strong> Primero fusionar (ahorrar módulos/RAM), luego desacoplar (mejorar cohesión), luego resolver circular, luego extraer utilidades.
+</div>
+
+<div class="callout callout-new">
+  <strong>🆕 Orden corregido:</strong> A.1 → A.2 → A.3 → A.4 (A.1 primero por ser independiente y servir de calibración del proceso).
+</div>
+
+<!-- ============================================================ -->
+<h2 id="plan">5. Plan de Refactorización por Fases</h2>
+
+<div class="table-wrap">
+<table>
+<tr><th>Fase</th><th>Nombre</th><th>Riesgo</th><th>Módulos afectados</th><th>Objetivo</th></tr>
+<tr>
+  <td><strong>A</strong></td>
+  <td>Fusiones de módulos pequeños</td>
+  <td><span class="badge badge-min">Mínimo</span></td>
+  <td>5 → 2 módulos</td>
+  <td>Ahorrar RAM, reducir imports</td>
+</tr>
+<tr>
+  <td><strong>B</strong></td>
+  <td>Desacoplar <code>fase4.py</code></td>
+  <td><span class="badge badge-med">Medio</span></td>
+  <td><code>fase4.py</code>, <code>alertas.py</code></td>
+  <td>Separar orquestación de construcción de emails</td>
+</tr>
+<tr>
+  <td><strong>C</strong></td>
+  <td>Reorganizar <code>itv_manager.py</code></td>
+  <td><span class="badge badge-med">Medio</span></td>
+  <td><code>itv_manager.py</code>, <code>fase4.py</code>, <code>placa.py</code>, <code>fase3.py</code></td>
+  <td>ITV centralizado, PRG unificado, transición sin circular</td>
+</tr>
+<tr>
+  <td><strong>D</strong></td>
+  <td>Reorganizar <code>datos_satelites.py</code></td>
+  <td><span class="badge badge-med">Medio</span></td>
+  <td><code>datos_satelites.py</code>, <code>tiempo.py</code></td>
+  <td>Romper circular, aislar N2YO</td>
+</tr>
+<tr>
+  <td><strong>E</strong></td>
+  <td>Extraer persistencia de <code>logger.py</code> <span class="badge badge-err">NO EJECUTAR</span></td>
+  <td><span class="badge badge-med">Medio</span></td>
+  <td><code>logger.py</code>, nuevo <code>persistence.py</code></td>
+  <td>Archivado para v8.0+. Persistencia de fase3_utils.py va a logger.py en Fase F.</td>
+</tr>
+<tr>
+  <td><strong>F</strong></td>
+  <td>Desmantelar <code>fase3_utils.py</code> <span class="badge badge-new">COMPLETADO</span></td>
+  <td><span class="badge badge-med">Medio</span></td>
+  <td><code>fase3_utils.py</code>, <code>alertas.py</code>, <code>logger.py</code>, <code>fase3.py</code></td>
+  <td>Eliminar cajón de sastre, distribuir responsabilidades</td>
+</tr>
+<tr>
+  <td><strong>G</strong></td>
+  <td>Limpieza de imports muertos <span class="badge badge-new">INCREMENTAL</span></td>
+  <td><span class="badge badge-low">Bajo</span></td>
+  <td>Todos los <code>.py</code></td>
+  <td>Eliminar imports sobrantes tras cada fase + revisión final</td>
+</tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="fase-a">6. Fase A — Fusiones de Módulos Pequeños <span class="badge badge-min">Riesgo Mínimo</span></h2>
+
+<div class="callout callout-new">
+  <strong>🆕 Orden de ejecución corregido:</strong> A.1 → A.2 → A.3 → A.4
+  <br><br>
+  <strong>Razón:</strong> A.1 es independiente del resto y sirve para calibrar el proceso de medición de RAM. A.2 crea <code>config_system.py</code>. A.3 añade <code>ConfigFase3</code> a ese módulo ya existente. A.4 fusiona <code>email_state.py</code> → <code>alertas.py</code>, que ya puede importar <code>config_system.py</code> si necesita leer config.
+  <br><br>
+  <strong>Checkpoint RAM obligatorio tras cada sub-fase.</strong> Ver §15 (Parte 4).
+</div>
+
+<h3>A.1: Fusionar <code>radio_base.py</code> → <code>radio_manager.py</code> <span class="badge badge-new">PRIMERO</span></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">A1</div>
+    <div class="step-title">radio_base.py + radio_manager.py</div>
+  </div>
+  <p><strong>Motivo:</strong> <code>radio_base.py</code> es una clase de 6 atributos sin métodos. <code>radio_manager.py</code> es su único usuario. Es completamente <strong>independiente</strong> de las demás fusiones.</p>
+  <p><strong>Acción:</strong> Mover la clase <code>RadioBase</code> al inicio de <code>radio_manager.py</code>, eliminar <code>from radio_base import RadioBase</code>, borrar <code>radio_base.py</code>.</p>
+  <div class="code">
+<span class="comment"># En radio_manager.py, reemplazar el import:</span>
+<span class="comment"># from radio_base import RadioBase  ← ELIMINAR</span>
+
+<span class="keyword">class</span> <span class="func">RadioBase</span>:
+    <span class="keyword">def</span> <span class="func">__init__</span>(self):
+        self.crc_actual = <span class="keyword">False</span>
+        self.rx_iq_actual = <span class="keyword">False</span>
+        self.frecuencia_actual = <span class="keyword">None</span>
+        self.sf_actual = <span class="keyword">None</span>
+        self.bw_actual = <span class="keyword">None</span>
+        self.cr_actual = <span class="keyword">None</span>
+        self.syncword_actual = <span class="keyword">None</span>
+        self.preamble_actual = <span class="keyword">None</span>
+  </div>
+  <p><strong>Impacto:</strong> -1 fichero, -1 import en RAM. <strong>Validación:</strong> Inicializar radio en fase3.</p>
+  <div class="callout callout-green">
+    <strong>🆕 Ventaja de empezar por A.1:</strong> Al ser independiente, si algo falla en la medición de RAM o en el proceso de fusión, no afecta a ninguna otra fase. Sirve como "prueba de concepto" para el resto del refactor.
+  </div>
+</div>
+
+<h3>A.2: Fusionar <code>estado.py</code> + <code>configuracion.py</code> → <code>config_system.py</code> <span class="badge badge-new">SEGUNDO</span></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">A2</div>
+    <div class="step-title">estado.py + configuracion.py → config_system.py</div>
+  </div>
+  <p><strong>Motivo:</strong> Ambos gestionan persistencia de configuración/estado en JSON. Son 60 + 50 líneas, muy pequeños para justificar módulos separados.</p>
+
+  <div class="callout callout-err">
+    <strong>⚠️ Cuidado con el circular:</strong> Si <code>configuracion.py</code> o <code>estado.py</code> importan actualmente <code>logger.py</code> (para <code>log_error</code>), la fusión crearía <code>config_system.py</code> ↔ <code>logger.py</code>.
+    <br><br>
+    <strong>Solución:</strong> <code>config_system.py</code> <strong>NO importa <code>logger.py</code></strong>. Usa <code>raise</code> en lugar de <code>log_error</code>. El llamador captura y loguea.
+  </div>
+
+  <p><strong>Acción:</strong> Crear <code>config_system.py</code> con todo el contenido de ambos, <strong>eliminando imports de <code>logger.py</code></strong>. Actualizar imports en todos los ficheros que los usaban.</p>
+  <div class="code">
+<span class="comment"># config_system.py — SIN import logger</span>
+<span class="keyword">import</span> json, errno, os
+
+VERSION = <span class="string">"V7.5"</span>
+NOMBRE_PROYECTO = <span class="string">"LEO"</span>
+_CONFIG_FILE = <span class="string">"config.json"</span>
+_CONFIG_CACHE = <span class="keyword">None</span>
+
+<span class="keyword">def</span> <span class="func">obtener_config</span>():
+    <span class="string">"""Lee config.json. Lanza OSError si falla."""</span>
+    ...
+
+<span class="keyword">def</span> <span class="func">version</span>(): <span class="keyword">return</span> VERSION
+<span class="keyword">def</span> <span class="func">nombre_proyecto</span>(): <span class="keyword">return</span> NOMBRE_PROYECTO
+<span class="keyword">def</span> <span class="func">firma_proyecto</span>(): <span class="keyword">return</span> <span class="string">f"{NOMBRE_PROYECTO} {VERSION}"</span>
+
+<span class="keyword">def</span> <span class="func">guardar_fase</span>(fase):
+    <span class="string">"""Guarda fase en estado.json. Lanza OSError si falla."""</span>
+    ...
+
+<span class="keyword">def</span> <span class="func">leer_fase</span>(): ...
+<span class="keyword">def</span> <span class="func">borrar_estado</span>(): ...
+
+<span class="comment"># El llamador se encarga del logging:</span>
+<span class="comment"># try:</span>
+<span class="comment">#     config = config_system.obtener_config()</span>
+<span class="comment"># except OSError as e:</span>
+<span class="comment">#     logger.log_error("Config", str(e))</span>
+  </div>
+  <p><strong>Impacto:</strong> -2 ficheros, -1 import por fichero que usaba ambos. <strong>Validación:</strong> Arranque completo por todas las fases.</p>
+</div>
+
+<h3>A.3: Fusionar <code>config_fase3.py</code> → <code>config_system.py</code> <span class="badge badge-new">TERCERO</span></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">A3</div>
+    <div class="step-title">config_fase3.py → config_system.py</div>
+  </div>
+  <p><strong>Motivo:</strong> <code>ConfigFase3</code> (100 líneas) es una cache de config específica para fase3. Hace parsing de horas, sweep, ventilador, heartbeat — todo es <strong>configuración</strong>. No justifica módulo propio cuando <code>config_system.py</code> ya gestiona config global + estado de fase.</p>
+  <p><strong>Acción:</strong> Mover la clase <code>ConfigFase3</code> al final de <code>config_system.py</code>. Cambiar import en <code>fase3.py</code> de <code>from config_fase3 import ConfigFase3</code> a <code>from config_system import ConfigFase3</code>.</p>
+  <div class="code">
+<span class="comment"># config_system.py (al final, tras funciones de estado)</span>
+
+<span class="keyword">class</span> <span class="func">ConfigFase3</span>:
+    <span class="string">"""Cachea parámetros de config relevantes para fase3."""</span>
+    <span class="keyword">def</span> <span class="func">__init__</span>(self, config): ...
+    <span class="keyword">def</span> <span class="func">_parsear_horas</span>(self, horas_raw): ...
+  </div>
+  <p><strong>Impacto:</strong> -1 fichero. <code>fase3.py</code> sigue funcionando igual. <code>config_system.py</code> se convierte en el único punto de entrada para toda la configuración del sistema.</p>
+  <p><strong>Validación:</strong> Arrancar fase3, verificar que <code>ConfigFase3</code> lee correctamente horas fijas, sweep, ventilador.</p>
+</div>
+
+<h3>A.3b: Evaluar <code>sweep_params.py</code> <span class="badge badge-new">OPCIONAL</span></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">A3b</div>
+    <div class="step-title">¿Fusionar sweep_params.py → config_system.py?</div>
+  </div>
+  <p><strong>Motivo:</strong> <code>sweep_params.py</code> (80 líneas) gestiona parámetros de sweep de frecuencia. Si es solo un diccionario de constantes, justifica fusión con <code>config_system.py</code>. Si contiene lógica de cálculo de frecuencias Doppler o algoritmos de búsqueda, debe quedar independiente.</p>
+
+  <div class="callout callout-warn">
+    <strong>⚠️ Decisión condicional:</strong>
+    <ul>
+      <li><strong>SÍ fusionar</strong> si <code>sweep_params.py</code> contiene solo constantes (dicts de frecuencias, rangos, pasos).</li>
+      <li><strong>NO fusionar</strong> si contiene funciones de cálculo (ej. <code>calcular_frecuencia_doppler()</code>, <code>ajustar_rango_sweep()</code>). En ese caso, renombrar a <code>sweep_engine.py</code> para claridad.</li>
+    </ul>
+  </div>
+
+  <p><strong>Acción:</strong> Revisar contenido de <code>sweep_params.py</code>. Si es solo datos, mover a <code>config_system.py</code> como <code>SWEEP_DEFAULTS</code> o similar. Si tiene lógica, dejar como módulo hoja y renombrar.</p>
+  <p><strong>Impacto:</strong> -1 fichero si se fusiona, o +0 con nombre más claro. <strong>Validación:</strong> Sweep funciona correctamente en fase3.</p>
+</div>
+
+<h3>A.4: Fusionar <code>email_state.py</code> → <code>alertas.py</code> <span class="badge badge-new">CUARTO</span></h3>
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">A4</div>
+    <div class="step-title">email_state.py → alertas.py</div>
+  </div>
+  <p><strong>Motivo:</strong> <code>email_state.py</code> gestiona horas fijas de envío (cuándo). <code>alertas.py</code> gestiona el envío SMTP (cómo). Ambos son "email".</p>
+
+  <div class="callout callout-new">
+    <strong>🆕 Ventaja del orden corregido:</strong> Como <code>config_system.py</code> ya existe (A.2), <code>alertas.py</code> puede importarlo limpiamente si necesita leer config para las horas de estado. No hay conflicto con D.3.
+  </div>
+
+  <p><strong>Acción:</strong> Mover la clase <code>EstadoEmail</code> al final de <code>alertas.py</code> (antes del <code>if __name__ == "__main__"</code>). Cambiar imports en <code>fase3.py</code> de <code>from email_state import EstadoEmail</code> a <code>from alertas import EstadoEmail</code>.</p>
+  <p><strong>Impacto:</strong> -1 fichero (28 → 22 tras A.1-A.4 + F; o 21 si A.3b se ejecuta). <strong>Validación:</strong> Enviar email de estado en hora fija.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="limpieza-a">7. Limpieza de Imports Incremental (Fase A)</h2>
+
+<div class="callout callout-new">
+  <strong>🆕 Novedad respecto al plan original:</strong> La limpieza de imports ya no es una fase final (G), sino un <strong>paso obligatorio tras cada sub-fase</strong>. Esto evita que imports muertos acumulados causen <code>ImportError</code> al arrancar fases posteriores.
+</div>
+
+<h3>7.1 Tras A.1 (radio_base.py eliminado)</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fichero afectado</th><th>Import a eliminar</th><th>Motivo</th></tr>
+<tr><td><code>radio_manager.py</code></td><td><code>from radio_base import RadioBase</code></td><td>RadioBase ahora está en radio_manager.py</td></tr>
+</table>
+</div>
+<p><strong>Acción:</strong> Buscar en todos los <code>.py</code>: <code>grep "from radio_base\|import radio_base" *.py</code> → eliminar.</p>
+
+<h3>7.2 Tras A.2 (estado.py + configuracion.py → config_system.py)</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fichero afectado</th><th>Import a eliminar/reemplazar</th><th>Nuevo import</th></tr>
+<tr><td><code>main.py</code></td><td><code>import estado</code>, <code>import configuracion</code></td><td><code>import config_system</code></td></tr>
+<tr><td><code>fase1.py</code></td><td><code>import estado</code>, <code>import configuracion</code></td><td><code>import config_system</code></td></tr>
+<tr><td><code>fase2.py</code></td><td><code>import estado</code>, <code>import configuracion</code></td><td><code>import config_system</code></td></tr>
+<tr><td><code>fase3.py</code></td><td><code>import estado</code>, <code>import configuracion</code></td><td><code>import config_system</code></td></tr>
+<tr><td><code>fase4.py</code></td><td><code>import estado</code>, <code>import configuracion</code></td><td><code>import config_system</code></td></tr>
+<tr><td><code>red.py</code></td><td><code>import estado</code> o <code>import configuracion</code></td><td><code>import config_system</code></td></tr>
+<tr><td><code>itv_manager.py</code></td><td><code>import configuracion</code></td><td><code>import config_system</code></td></tr>
+<tr><td><code>fase3_utils.py</code></td><td><code>from estado import guardar_fase</code></td><td><code>from config_system import guardar_fase</code></td></tr>
+<tr><td><code>alertas.py</code></td><td><code>from configuracion import obtener_config, version, nombre_proyecto</code></td><td><code>from config_system import obtener_config, version, nombre_proyecto</code></td></tr>
+<tr><td><code>logger.py</code></td><td><code>from configuracion import obtener_config</code></td><td><code>from config_system import obtener_config</code></td></tr>
+</table>
+</div>
+
+<h3>7.3 Tras A.3 (config_fase3.py eliminado)</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fichero afectado</th><th>Import a cambiar</th><th>Nuevo import</th></tr>
+<tr><td><code>fase3.py</code></td><td><code>from config_fase3 import ConfigFase3</code></td><td><code>from config_system import ConfigFase3</code></td></tr>
+</table>
+</div>
+
+<h3>7.4 Tras A.4 (email_state.py eliminado)</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Fichero afectado</th><th>Import a cambiar</th><th>Nuevo import</th></tr>
+<tr><td><code>fase3.py</code></td><td><code>from email_state import EstadoEmail</code></td><td><code>from alertas import EstadoEmail</code></td></tr>
+</table>
+</div>
+
+<div class="callout callout-warn">
+  <strong>⚠️ No automatizar:</strong> En MicroPython, un <code>ImportError</code> puede dejar la placa en estado irrecuperable sin REPL. Revisar cada fichero manualmente, línea por línea. Validar con soft-reset (Ctrl+D) tras cada limpieza.
+</div>
+
+<!-- ============================================================ -->
+<div class="footer">
+  <p>Informe generado el 22 de julio de 2026 para ITV LEO v7.5.1 — <strong>Revisión 2</strong></p>
+  <p>Próximo paso crítico: <strong>Subir placa al techo + antena ajustada a 431 MHz</strong></p>
+  <p>No ejecutar refactorización hasta validar 24-48h de estabilidad en campo</p>
+  <p><em>Parte 2 de 4 — Continúa en Parte 3: Fases B, C, D</em></p>
+</div>
+
+</div>
+</body>
+</html>
