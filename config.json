@@ -1,0 +1,257 @@
+{
+  "wifi_ssid": "MIWIFI_CTxc",
+  "wifi_pass": "YbUmahAX",
+  "remitente_gmail": "emilio.florido@gmail.com",
+  "clave_aplicacion": "cpasalbftyqfjoxk",
+  "destinatario": "emilio.florido@gmail.com",
+  "n2yo_api_key": "JBB6RW-7UAJRQ-57ED7N-5QXW",
+  "max_satelites": 50,
+  "debug_consola": true,
+  "buscar_parametros": false,
+  "doppler": false,
+  "email_estado_cada_minutos": 0,
+  "email_estado_automatico": true,
+  "email_estado_vacio": false,
+  "email_estado_horas_fijas": [ "08:00", "15:30", "20:00" ],  
+  "heartbeat": true,
+  "heartbeat_intervalo_base_min": 15,
+  "heartbeat_intervalo_pase_min": 2,
+  "max_logs_txt_kb": 50,
+  "max_logs_txt_lineas": 200,
+  "max_errores_email_chars": 2000,
+  "max_hb_acumulados": 200,
+  "activar_rx_diag": true,
+  "ubicacion_actual": "Sevilla",
+  "ancho_banda_hz": "250000",
+  "lora_sf": 10,
+  "lora_cr": 5,
+  "lora_sync_word": 18,
+  "lora_preamble_len": 8,
+  "implicit_header": false,
+  "payload_len": 255,
+  "configuracion_geografica": {
+    "Sevilla": {
+      "lat": "37.389",
+      "lon": "-5.984",
+      "alt": "10",
+      "min_elev": "10"
+    },
+    "Cadiz": {
+      "lat": "36.527",
+      "lon": "-6.288",
+      "alt": "5",
+      "min_elev": "15"
+    }
+  },
+  "grupo_satelites_actual": "uhf_433",
+  "perfiles_satelites": {
+    "uhf_433": {
+      "frecuencia_base_espera_hz": "436700000",
+      "ancho_banda_hz": "250000",
+      "lora_sf": 10,
+      "lora_cr": 5,
+      "lora_sync_word": 18,
+      "lora_preamble_len": 8,
+      "parametros_sweep": {
+        "activo": false,
+        "intervalo_seg": 5,
+        "combinaciones": [
+          {
+            "rx_iq": false,
+            "crc_on": false,
+            "implicit_header": false,
+            "sync_word": 18
+          },
+          {
+            "rx_iq": false,
+            "crc_on": true,
+            "implicit_header": false,
+            "sync_word": 18
+          },
+          {
+            "rx_iq": true,
+            "crc_on": false,
+            "implicit_header": false,
+            "sync_word": 18
+          },
+          {
+            "rx_iq": true,
+            "crc_on": true,
+            "implicit_header": false,
+            "sync_word": 18
+          }
+        ]
+      },
+      "satelites": {
+        "TRISAT-3": {
+          "id": "67299",
+          "frec": 436700000,
+          "ancho_banda_hz": "250000",
+          "lora_sf": 10,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false,
+          "identificacion_header": {
+            "reglas": [
+              {
+                "offset": 0,
+                "valor": "0xA5",
+                "descripcion": "header_magic"
+              },
+              {
+                "offset": 1,
+                "valor": "0x01",
+                "descripcion": "version"
+              },
+              {
+                "offset": 2,
+                "valor": "0x80",
+                "descripcion": "sat_id_msb"
+              },
+              {
+                "offset": 3,
+                "valor": "0xFF",
+                "descripcion": "sat_id_lsb"
+              },
+              {
+                "offset": 4,
+                "valor": "0x80",
+                "mask": "0xF0",
+                "descripcion": "config_flags_msb"
+              },
+              {
+                "offset": 5,
+                "valor": "0x0F",
+                "descripcion": "config_flags_lsb_trisat3"
+              }
+            ],
+            "longitud_minima": 6,
+            "familia_header": "trisat"
+          }
+        },
+        "TRISAT-4": {
+          "id": "67482",
+          "frec": 436700000,
+          "ancho_banda_hz": "250000",
+          "lora_sf": 10,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false,
+          "identificacion_header": {
+            "reglas": [
+              {
+                "offset": 0,
+                "valor": "0xA5",
+                "descripcion": "header_magic"
+              },
+              {
+                "offset": 1,
+                "valor": "0x01",
+                "descripcion": "version"
+              },
+              {
+                "offset": 2,
+                "valor": "0x80",
+                "descripcion": "sat_id_msb"
+              },
+              {
+                "offset": 3,
+                "valor": "0xFF",
+                "descripcion": "sat_id_lsb"
+              },
+              {
+                "offset": 4,
+                "valor": "0x80",
+                "mask": "0xF0",
+                "descripcion": "config_flags_msb"
+              }
+            ],
+            "longitud_minima": 5,
+            "familia_header": "trisat"
+          }
+        },
+        "NORBI-2": {
+          "id": "57179",
+          "frec": 436700000,
+          "ancho_banda_hz": "250000",
+          "lora_sf": 10,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false,
+          "identificacion_header": {
+            "reglas": [
+              {
+                "offset": 0,
+                "valor": "0x8E",
+                "descripcion": "header_magic"
+              }
+            ],
+            "longitud_minima": 1,
+            "longitud_exacta": 143
+          }
+        },
+        "KOSAR-1.5": {
+          "id": "67264",
+          "frec": 436100000,
+          "ancho_banda_hz": "125000",
+          "lora_sf": 8,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false,
+          "lora_sync_word": 52
+        },
+        "SM-3.1": {
+          "id": "67275",
+          "frec": 435140000,
+          "ancho_banda_hz": "62500",
+          "lora_sf": 8,
+          "lora_cr": 6,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false
+        }
+      }
+    }
+  },
+  "ventilador_gpio": 38,
+  "ventilador_activo": true,
+  "ventilador_umbral_on_c": 48,
+  "ventilador_umbral_off_c": 44,
+  "pre_lna_offset_db": 23.0,
+  "seguridad_hardware": {
+    "timeout_red_segundos": 20,
+    "max_intentos_wifi": 10,
+    "minima_ram_alerta_bytes": 10000
+  },
+  "depuracion_activa": true,
+  "preservar_errores_log": true,
+  "max_errores_log_kb": 100,
+  "itv": {
+    "dias_maximos": 90,
+    "ventilador_activaciones_7d": 3,
+    "delta_temp_maxima_c": 5,
+    "delta_rssi_db": 10,
+    "reinicios_7d": 2,
+    "dias_sin_capturas": 7,
+    "dias_sin_heartbeat_enviado": 3
+  }
+}
