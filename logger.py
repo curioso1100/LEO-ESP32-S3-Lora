@@ -5,7 +5,7 @@
 import os
 import json
 
-from configuracion import obtener_config
+from config_system import obtener_config
 from tiempo import obtener_tiempo_actual
 
 

@@ -5,7 +5,7 @@ import network
 import time
 import gc
 
-from configuracion import obtener_config
+from config_system import obtener_config
 from logger import log_debug, log_warn
 from placa import led_patron_error
 

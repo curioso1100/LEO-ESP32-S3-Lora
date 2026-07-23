@@ -1,11 +1,12 @@
 # =========================================================================
 # SUBMÓDULO: doppler_motor.py - MOTOR DE CÁLCULO DE PASES Y AGENDA
 # =========================================================================
+
 import json
 import datos_satelites
 
 from logger import log_debug
-from configuracion import obtener_config
+from config_system import obtener_config
 
 __all__ = ["calcular_parametros_satelite", "auditar_agenda_consola"]
 

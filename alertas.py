@@ -6,7 +6,7 @@ import json
 import time
 
 from logger import log_info, log_debug, log_warn, log_error
-from configuracion import obtener_config, version, nombre_proyecto
+from config_system import obtener_config, version, nombre_proyecto
 from tiempo import obtener_unix_utc_real, obtener_tiempo_actual
 
 CONFIG = obtener_config()
@@ -214,7 +214,6 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
                 except Exception as e_pase:
                     log_warn("SMTP", "Pase omitido por datos invalidos: {}".format(e_pase))
 
-            # NUEVO v7.4.1: Linea con horas previstas de envio de estado
             try:
                 horas_estado = c.get("email_estado_horas_fijas", [])
                 if horas_estado:

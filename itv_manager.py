@@ -139,8 +139,7 @@ class ITVManager:
 
     def _reconstruir_desde_heartbeat_log(self):
         """Reconstruye métricas desde heartbeat.log.
-
-        FIX v7.3.0: Calcula dias_acumulados basado en tiempo transcurrido real,
+        Calcula dias_acumulados basado en tiempo transcurrido real,
         no solo en conteo de heartbeats. Esto evita que siempre muestre dias=1.
         """
         try:
@@ -168,7 +167,7 @@ class ITVManager:
 
         hb_count = len([l for l in lineas if l.strip().startswith("HB ")])
 
-        # FIX v7.3.0: Calcular dias_acumulados desde el primer heartbeat
+        # Calcular dias_acumulados desde el primer heartbeat
         dias_estimados = self._calcular_dias_desde_primer_hb(lineas, utc_actual)
         if dias_estimados < 1:
             dias_estimados = max(1, hb_count // 96)
@@ -191,7 +190,7 @@ class ITVManager:
             dias_estimados, hb_count, self._estado['capturas_ultimos_7d'], dia_actual))
 
     def _calcular_dias_desde_primer_hb(self, lineas, utc_actual):
-        """NUEVO v7.3: Extrae timestamp del primer heartbeat y calcula días transcurridos."""
+        # Extrae timestamp del primer heartbeat y calcula días transcurridos
         try:
             for linea in lineas:
                 if linea.strip().startswith("HB "):
@@ -217,7 +216,7 @@ class ITVManager:
                    utc_actual, t_local_tuple):
         dia_actual = t_local_tuple[7]
 
-        # FIX v7.3.0: Calcular días transcurridos desde último timestamp diario
+        # Calcular días transcurridos desde último timestamp diario
         dias_transcurridos = self._calcular_dias_transcurridos(utc_actual)
 
         # Reset diario: si ha pasado al menos un día real desde último reset
@@ -272,7 +271,7 @@ class ITVManager:
             self._guardar_estado()
 
     def _calcular_dias_transcurridos(self, utc_actual):
-        """NUEVO v7.3: Calcula días reales transcurridos desde último reset diario."""
+        # Calcula días reales transcurridos desde último reset diario
         ultimo_ts = self._estado.get("ultimo_timestamp_diario", 0)
         if ultimo_ts == 0:
             return 0
@@ -501,7 +500,7 @@ class ITVManager:
         self._itv_pendiente = True
         self._motivo_itv = [motivo]
         self._preparar_email_itv(utc_actual, [motivo], 0)
-        # FIX v7.3.1: Crear estado_pendiente.json para forzar transicion a fase4
+        # Crear estado_pendiente.json para forzar transicion a fase4
         try:
             estado_minimo = {
                 "tipo": "estado",
@@ -520,7 +519,7 @@ class ITVManager:
                 json.dump(estado_minimo, f)
                 f.flush()
                 os.sync()
-            from estado import guardar_fase
+            from config_system import guardar_fase
             guardar_fase(4)
             log_warn("ITV", "ITV forzada: {} -> estado_pendiente + fase4 preparados".format(motivo))
         except Exception as e:
@@ -531,7 +530,7 @@ class ITVManager:
     # ------------------------------------------------------------------
 
     def resumen_compacto(self):
-        """NUEVO v7.3: Muestra dias_acum/dias_max compacto."""
+        # Muestra dias_acum/dias_max compacto
         dias = self._estado["dias_acumulados"]
         dias_max = self._umbrales["dias_maximos"]
         pendiente = "PENDIENTE" if self._itv_pendiente else "OK"

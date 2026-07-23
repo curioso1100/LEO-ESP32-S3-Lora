@@ -13,7 +13,7 @@ from logger import (
     escribir_captura, escribir_heartbeat, leer_errores_para_email
 )
 from tiempo import obtener_tiempo_actual
-from estado import guardar_fase
+from config_system import guardar_fase
 
 
 # =========================================================================

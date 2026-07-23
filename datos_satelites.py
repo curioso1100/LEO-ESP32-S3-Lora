@@ -10,7 +10,7 @@ import os
 
 from logger import log_info, log_debug, log_warn, log_error
 
-from configuracion import obtener_config
+from config_system import obtener_config
 from tiempo import obtener_tiempo_actual
 CONFIG = obtener_config()
 
@@ -62,9 +62,6 @@ def _resolver_parametros_lora(info, grupo_data, c):
     }
 
 
-# =========================================================================
-# NUEVO v7.4.1: Calcula horas automaticas de envio de estado entre pases
-# =========================================================================
 def _calcular_horas_estado_automaticas(pases_ordenados, desfase_segundos):
     """
     Recibe lista de pases ordenados por utc_ini_timestamp.
@@ -125,7 +122,7 @@ def _calcular_horas_estado_automaticas(pases_ordenados, desfase_segundos):
 
 
 def _guardar_config_con_horas_estado(horas_estado):
-    """NUEVO v7.4.1d: Reescribe SOLO la linea email_estado_horas_fijas
+    """ Reescribe SOLO la linea email_estado_horas_fijas
     preservando el formato original del config.json. Usa write() en lugar
     de writelines() (no disponible en MicroPython)."""
 
@@ -339,7 +336,6 @@ def descargar_agenda_completa(fecha_hoy):
         # Ordenacion cronologica por marca Unix
         pases_consolidados.sort(key=lambda x: x["utc_ini_timestamp"])
 
-        # NUEVO v7.4.1: Calcular horas de estado automaticas si esta activado
         email_estado_automatico = c.get("email_estado_automatico", False)
         if email_estado_automatico:
             log_info("ESTADO_AUTO", "Modo automatico activado. Calculando horas de estado...")
@@ -423,12 +419,8 @@ def obtener_objeto_satelite(utc_api_actual, debug_activo=True):
     return None
 
 
-# =========================================================================
-# NUEVO v7.5.1: Obtener horas pendientes de envio de estado
-# Movido desde fase4.py para desacoplar logica de tiempo del envio de emails.
-# =========================================================================
 def obtener_horas_pendientes_estado():
-    """Devuelve lista de horas fijas de estado pendientes de envio.
+    """ Devuelve lista de horas fijas de estado pendientes de envio.
     Gestiona correctamente el cruce de medianoche en la lista de horas."""
     horas_fijas = CONFIG.get("email_estado_horas_fijas", [])
     if not horas_fijas:

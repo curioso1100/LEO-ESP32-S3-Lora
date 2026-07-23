@@ -1,17 +1,7 @@
 # =========================================================================
-# MÓDULO: fase3.py - SUPERVISOR DE ESCUCHA ACTIVA  (v7.2.0 + ITV)
+# MÓDULO: fase3.py - SUPERVISOR DE ESCUCHA ACTIVA
 # =========================================================================
-# REFACTOR: Clases extraídas a módulos independientes
-#   - config_fase3.py  → ConfigFase3
-#   - radio_manager.py → RadioManager
-#   - sweep_params.py  → SweepParametros
-#   - sat_identifier.py→ IdentificadorSat
-#   - email_state.py   → EstadoEmail
-#   - fase3_utils.py   → Funciones auxiliares
-#   - itv_manager.py   → ITVManager
-#
-# fase3.py ahora es solo el orquestador del bucle principal.
-# =========================================================================
+
 
 import machine
 import time
@@ -20,14 +10,13 @@ import gc
 import os
 
 import placa
-from estado import guardar_fase
+from config_system import guardar_fase, obtener_config
 from logger import (
     log_info, log_debug, log_warn, log_error, log_exception,
     rotar_logs_txt
 )
 from tiempo import obtener_unix_utc_real, obtener_tiempo_actual
 
-from configuracion import obtener_config
 CONFIG = obtener_config()
 
 from doppler_motor import calcular_parametros_satelite

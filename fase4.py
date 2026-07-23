@@ -10,12 +10,11 @@ import os
 import gc
 
 from placa import led_on, led_off, led_blink, reiniciar, prg_pulsado
-from estado import guardar_fase
+from config_system import guardar_fase, obtener_config, version, nombre_proyecto
 from logger import (
     log_info, log_debug, log_warn, log_error, log_exception,
     leer_estado_pendiente, borrar_estado_pendiente
 )
-from configuracion import obtener_config, version, nombre_proyecto
 from red import conectar_wifi, apagar_wifi, sincronizar_ntp
 from tiempo import obtener_tiempo_actual, obtener_unix_utc_real, formatear_fecha_utc
 from datos_satelites import obtener_horas_pendientes_estado
@@ -26,7 +25,7 @@ DEBUG_MODO = CONFIG.get("debug_consola", True)
 # RAM minima para envio seguro (SSL ~35KB + email ~15KB + margen)
 _MIN_RAM_ENVIO = 22000
 
-# V6.25-fix2: Tamano maximo de payload por email de capturas (chars)
+# Tamano maximo de payload por email de capturas (chars)
 _MAX_PAYLOAD_CAPTURAS_CHARS = 8500
 
 
@@ -82,13 +81,13 @@ def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
     if fs_libre_kb is not None:
         partes.append("Espacio filesystem: {:.0f}KB libres".format(fs_libre_kb))
 
-    # NUEVO v7.2: Contadores de recepcion para diagnostico
+    # Contadores de recepcion para diagnostico
     partes.append("Paquetes capturados: {} | Descartados: {}".format(
         paquetes_capturados, paquetes_descartados))
 
     if num_hb > 0:
         partes.append("BASE: {} | PASE: {}".format(base_count, pase_count))
-        # NUEVO v7.4.2: Horas pendientes de envio de estado
+        # Horas pendientes de envio de estado
         if horas_pendientes:
             partes.append("Horas pendientes de envio de email de estado: {}".format(
                 ", ".join(horas_pendientes)))
@@ -97,7 +96,7 @@ def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
         partes.extend(heartbeats)
     else:
         partes.append("(Sin heartbeats acumulados)")
-        # NUEVO v7.4.2: Horas pendientes incluso sin heartbeats
+        # Horas pendientes incluso sin heartbeats
         if horas_pendientes:
             partes.append("Horas pendientes de envio de email de estado: {}".format(
                 ", ".join(horas_pendientes)))
@@ -145,7 +144,7 @@ def enviar_email_estado(estado_pendiente):
     ventilador_on = estado_pendiente.get("ventilador_on", False)
     fs_libre_kb = estado_pendiente.get("fs_libre_kb", None)
     errores = estado_pendiente.get('errores', '')
-    # NUEVO v7.2: Extraer contadores ANTES de liberar estado_pendiente
+    # Extraer contadores ANTES de liberar estado_pendiente
     paquetes_capturados = estado_pendiente.get("paquetes_capturados", 0)
     paquetes_descartados = estado_pendiente.get("paquetes_descartados", 0)
 
@@ -154,7 +153,7 @@ def enviar_email_estado(estado_pendiente):
     base_count = sum(1 for hb in heartbeats if "BASE" in hb)
     pase_count = sum(1 for hb in heartbeats if "PASE" in hb)
 
-    # NUEVO v7.4.1: Modo no-vacio — omitir envio si no hay capturas
+    # Modo no-vacio — omitir envio si no hay capturas
     email_estado_vacio = CONFIG.get("email_estado_vacio", True)
     if not email_estado_vacio and num_cap == 0:
         log_info("FASE4", "Modo no-vacio activo: 0 capturas, omitiendo envio de estado")
@@ -164,7 +163,6 @@ def enviar_email_estado(estado_pendiente):
         _borrar_logs_originales()
         return True
 
-    # v7.5.1: Calcular horas pendientes (logica movida a datos_satelites.py)
     horas_pendientes = obtener_horas_pendientes_estado()
 
     # Liberar estado_pendiente de memoria lo antes posible
@@ -178,7 +176,6 @@ def enviar_email_estado(estado_pendiente):
     # ============================================================
     log_info("FASE4", "Preparando Email 1: Estado + Heartbeats...")
 
-    # MODIFICADO v7.4.2: Pasar horas_pendientes al constructor
     cuerpo_estado = _construir_email_estado(
         heartbeats, num_hb, base_count, pase_count,
         temp_cpu, ventilador_on, fs_libre_kb, errores,
@@ -307,7 +304,7 @@ def enviar_email_estado(estado_pendiente):
 
 def _enviar_email_itv_pendiente():
     """Detecta y envía email ITV pendiente.
-    FIX v7.3.1: Se llama DESPUES de conectar WiFi (antes fallaba DNS -202).
+    Se llama DESPUES de conectar WiFi (antes fallaba DNS -202).
     Retorna True si se envió, False si no había pendiente o falló.
     """
     try:
@@ -513,7 +510,7 @@ def ejecutar():
     if ok_ntp:
         log_debug("NTP", "Sincronizado con {}".format(servidor))
 
-    # --- FIX v7.3.1: Enviar email ITV DESPUES de tener WiFi ---
+    # Enviar email ITV DESPUES de tener WiFi ---
     itv_enviado = _enviar_email_itv_pendiente()
     if itv_enviado:
         log_info("FASE4", "Email ITV enviado. Procediendo con email de estado normal...")

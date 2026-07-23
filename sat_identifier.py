@@ -20,7 +20,6 @@ class IdentificadorSat:
                     if id_cfg:
                         num_reglas = len(id_cfg.get("reglas", []))
                         long_min = id_cfg.get("longitud_minima", 1)
-                        # CORREGIDO v7.4.1: long_exacta estaba invertida
                         # Los satelites CON longitud_exacta son mas especificos
                         # y deben evaluarse PRIMERO (prioridad alta = 1000)
                         long_exacta = 0 if id_cfg.get("longitud_exacta") is None else 1000

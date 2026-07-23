@@ -1,5 +1,5 @@
 # =========================================================================
-# MÓDULO: fase2.py - REPORTE DIARIO DE PASES  (v6.21 SIMPLIFICADO)
+# MÓDULO: fase2.py - REPORTE DIARIO DE PASES
 # =========================================================================
 
 import machine
@@ -11,9 +11,8 @@ import os
 
 from placa import led_on, led_off, led_blink, reiniciar
 from red import conectar_wifi, apagar_wifi
-from estado import guardar_fase
+from config_system import guardar_fase, obtener_config, version, nombre_proyecto
 from logger import log_info, log_debug, log_warn, log_error, log_exception
-from configuracion import obtener_config, version, nombre_proyecto
 
 # Carga de parámetros locales
 CONFIG = obtener_config()
@@ -87,11 +86,6 @@ def ejecutar():
                     log_error("FASE2", "Error accediendo a {}: {}".format(ARCHIVO_LOGS, exc))
                 except Exception as exc:
                     log_exception("FASE2", "Error inesperado con logs: {}".format(exc))
-
-            # --- ELIMINADO v6.21: Envío 3 (Diagnóstico diario) ---
-            # El diagnóstico diario con errores.log + heartbeat.log + satelites_cazados.txt
-            # se ha movido al mecanismo unificado de fase3 -> estado_pendiente.json -> fase4.
-            # Ver configuración "email_estado_horas_fijas": ["23:59"] para equivalente.
 
             # --- Resumen de resultados ---
             ok_principal = "OK" if resultado_principal else "FALLO"

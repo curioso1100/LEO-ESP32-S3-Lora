@@ -15,13 +15,12 @@ from placa import (
     Ventilador
 )
 
-from estado import guardar_fase
+from config_system import guardar_fase, obtener_config
 
 from logger import (log_info, log_debug, log_warn, log_error, log_exception)
 from red import conectar_wifi, apagar_wifi, sincronizar_ntp
 
 # Carga de parámetros locales
-from configuracion import obtener_config
 CONFIG = obtener_config()
 
 SSID = CONFIG["wifi_ssid"]
@@ -29,7 +28,6 @@ WIFI_PASS = CONFIG["wifi_pass"]
 DEBUG_MODO = CONFIG.get("debug_consola", True)
 MAX_INTENTOS_WIFI = int(CONFIG["seguridad_hardware"]["max_intentos_wifi"])
 
-# NUEVO v7.3.4: Configuración de ventilador (solo lo que ya existe en config)
 _VENTILADOR_GPIO = int(CONFIG.get("ventilador_gpio", 38))
 _VENTILADOR_ACTIVO = CONFIG.get("ventilador_activo", False)
 
@@ -38,7 +36,7 @@ def ejecutar():
     led_blink(1)
     led_on()
 
-    # NUEVO v7.3.4: Ventilador de mantenimiento
+    # Ventilador de mantenimiento
     ventilador = None
     if _VENTILADOR_ACTIVO:
         ventilador = Ventilador(_VENTILADOR_GPIO)
@@ -83,7 +81,7 @@ def ejecutar():
 
             gc.collect()
             if datos_satelites.descargar_agenda_completa(fecha_hoy):
-                # NUEVO v7.3.4: Apagar ventilador ANTES de reiniciar
+                # Apagar ventilador ANTES de reiniciar
                 if ventilador is not None:
                     ventilador.apagar()
                     log_info("VENT", "Ventilador apagado")
@@ -101,7 +99,7 @@ def ejecutar():
         finally:
             apagar_wifi()
             led_off()
-            # NUEVO v7.3.4: Apagar ventilador en caso de error
+            # Apagar ventilador en caso de error
             if ventilador is not None:
                 ventilador.apagar()
                 log_info("VENT", "Ventilador apagado (error)")
@@ -115,7 +113,7 @@ def ejecutar():
         log_warn("WIFI", "Imposible establecer conexión con wifi")
         apagar_wifi()
         led_off()
-        # NUEVO v7.3.4: Apagar ventilador si WiFi falla
+        # Apagar ventilador si WiFi falla
         if ventilador is not None:
             ventilador.apagar()
             log_info("VENT", "Ventilador apagado (WiFi fallido)")
