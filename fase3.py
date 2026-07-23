@@ -107,16 +107,12 @@ def ejecutar():
     placa.led_off()
 
     # --- Lazy imports con gc.collect() para evitar fragmentación de heap ---
-    gc.collect()
-    from config_fase3 import ConfigFase3
+    gc.collect() 
+    from config_system import ConfigFase3, EstadoEmail, SweepParametros
     gc.collect()
     from radio_manager import RadioManager
     gc.collect()
-    from sweep_params import SweepParametros
-    gc.collect()
     from sat_identifier import IdentificadorSat
-    gc.collect()
-    from email_state import EstadoEmail
     gc.collect()
     from fase3_utils import (
         verificar_agenda_o_reiniciar,
