@@ -4,8 +4,43 @@ from _sx126x import *
 gc.collect()
 from sx126x import SX126X
 gc.collect()
-from radio_base import RadioBase
-gc.collect()
+
+# -------------------------------------------------------------------------
+# Clase RadioBase (migrada desde radio_base.py)
+# -------------------------------------------------------------------------
+# NOTA: Toda nueva implementación de radio debe heredar de RadioBase
+# para disponer del estado común:
+#   crc_actual
+#   rx_iq_actual
+#
+# Interfaz mínima requerida por fase3.py:
+#   begin(...)
+#   recv()
+#   setBlockingCallback()
+#   setFrequency()
+#   setRxIq()
+#   setSyncWord()
+#   standby()
+#   writeRegister()
+#
+# Estado requerido:
+#   crc_actual
+#   rx_iq_actual
+# -------------------------------------------------------------------------
+
+class RadioBase:
+    """Estado base del radio."""
+
+    def __init__(self):
+        self.crc_actual = False
+        self.rx_iq_actual = False
+        self.frecuencia_actual = None
+        self.sf_actual = None
+        self.bw_actual = None
+        self.cr_actual = None
+        self.syncword_actual = None
+        self.preamble_actual = None
+
 
 _SX126X_PA_CONFIG_SX1262 = const(0x00)
 

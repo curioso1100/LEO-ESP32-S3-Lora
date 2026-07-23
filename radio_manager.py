@@ -1,12 +1,15 @@
 # =========================================================================
 # MÓDULO: radio_manager.py - Manager completo del radio SX1262 V7.2
 # =========================================================================
+# FUSIÓN A.1: RadioBase integrado en sx1262.py (antes en radio_base.py)
+# Fecha refactor: 2026-07-23
+# =========================================================================
 
 
 import gc
 import time
 
-from radio_base import RadioBase
+from sx1262 import RadioBase
 from logger import log_info, log_warn, log_persistente, log_rx_diag, log_error
 
 
