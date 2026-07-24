@@ -16,8 +16,8 @@ from logger import (
     leer_estado_pendiente, borrar_estado_pendiente
 )
 from red import conectar_wifi, apagar_wifi, sincronizar_ntp
-from tiempo import obtener_tiempo_actual, obtener_unix_utc_real, formatear_fecha_utc
-from datos_satelites import obtener_horas_pendientes_estado
+from tiempo_satelites import obtener_tiempo_actual, obtener_unix_utc_real, formatear_fecha_utc
+from tiempo_satelites import obtener_horas_pendientes_estado
 
 CONFIG = obtener_config()
 DEBUG_MODO = CONFIG.get("debug_consola", True)

@@ -15,7 +15,7 @@ from logger import (
     log_info, log_debug, log_warn, log_error, log_exception,
     rotar_logs_txt
 )
-from tiempo import obtener_unix_utc_real, obtener_tiempo_actual
+from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual
 
 CONFIG = obtener_config()
 

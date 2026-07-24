@@ -51,7 +51,7 @@ def ejecutar():
 
     if conectar_wifi():
         try:
-            import datos_satelites
+            from tiempo_satelites import obtener_desfase_espana, descargar_agenda_completa
 
             log_info("WIFI", "Conectado. Iniciando sincronización NTP")
 
@@ -69,7 +69,7 @@ def ejecutar():
                 int(t_utc[3]), int(t_utc[4]), int(t_utc[5]), 0
             ))
 
-            desfase = datos_satelites.obtener_desfase_espana(utc_ahora)
+            desfase = obtener_desfase_espana(utc_ahora)
             local_segundos = utc_ahora + desfase
             t_loc = time.localtime(local_segundos)
 
@@ -80,7 +80,7 @@ def ejecutar():
             log_debug("RTC", "Hora local España {:02d}:{:02d}:{:02d}".format(t_loc[3], t_loc[4], t_loc[5]))
 
             gc.collect()
-            if datos_satelites.descargar_agenda_completa(fecha_hoy):
+            if descargar_agenda_completa(fecha_hoy):
                 # Apagar ventilador ANTES de reiniciar
                 if ventilador is not None:
                     ventilador.apagar()

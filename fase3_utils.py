@@ -12,7 +12,7 @@ from logger import (
     log_info, log_debug, log_warn, log_exception, log_persistente,
     escribir_captura, escribir_heartbeat, leer_errores_para_email
 )
-from tiempo import obtener_tiempo_actual
+from tiempo_satelites import obtener_tiempo_actual
 from config_system import guardar_fase
 
 
@@ -288,17 +288,8 @@ def sincronizar_ntp_si_necesario(cfg):
     import time
     if time.localtime()[0] >= 2026:
         return
-    log_warn("RTC", "RTC corrupto - intentando sincronizar via NTP")
-    from red import conectar_wifi, apagar_wifi, sincronizar_ntp
+    log_warn("RTC", "RTC corrupto - transicionando a fase1 para sincronizar")
+    guardar_fase(1)
+    time.sleep_ms(500)
     from placa import reiniciar
-    if not conectar_wifi():
-        log_warn("NTP", "Sin conexion WiFi - reiniciando para reintentar")
-        time.sleep(2)
-        reiniciar()
-    ok, host = sincronizar_ntp()
-    apagar_wifi()
-    gc.collect()
-    if not ok:
-        log_warn("NTP", "Todos los servidores fallaron - reiniciando para reintentar")
-        time.sleep(2)
-        reiniciar()
+    reiniciar()

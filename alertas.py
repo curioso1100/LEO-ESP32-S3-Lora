@@ -7,7 +7,7 @@ import time
 
 from logger import log_info, log_debug, log_warn, log_error
 from config_system import obtener_config, version, nombre_proyecto
-from tiempo import obtener_unix_utc_real, obtener_tiempo_actual
+from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual
 
 CONFIG = obtener_config()
 
@@ -59,7 +59,7 @@ def _cargar_agenda_segura():
 def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug_activo=False):
     import socket
     import ssl
-    import datos_satelites
+    from tiempo_satelites import obtener_desfase_espana
 
     log_info("SMTP", "Gestionando el envio de email")
 
@@ -80,7 +80,7 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
     try:
         _, hora_arranque, _ = obtener_tiempo_actual()
         gc.collect()  # liberar memoria usada por calculo de tiempo
-        desfase_segundos = datos_satelites.obtener_desfase_espana(obtener_unix_utc_real())
+        desfase_segundos = obtener_desfase_espana(obtener_unix_utc_real())
         gc.collect()
 
         if debug_activo:

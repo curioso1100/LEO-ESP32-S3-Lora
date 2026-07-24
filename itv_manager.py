@@ -12,7 +12,7 @@
 #
 # 2. VER ESTADO ITV:
 #    >>> from itv_manager import ITVManager
-#    >>> from tiempo import obtener_unix_utc_real
+#    >>> from tiempo_satelites import obtener_unix_utc_real
 #    >>> itv = ITVManager()
 #    >>> print(itv.resumen_compacto())   # Ej: "ITV:OK 3/90 -"
 #    >>> print(itv.info_debug())        # Dict con metricas completas
@@ -152,13 +152,13 @@ class ITVManager:
             return
 
         try:
-            from tiempo import obtener_unix_utc_real
+            from tiempo_satelites import obtener_unix_utc_real
             utc_actual = obtener_unix_utc_real()
         except Exception:
             utc_actual = int(time.time())
 
         try:
-            from tiempo import obtener_tiempo_actual
+            from tiempo_satelites import obtener_tiempo_actual
             _, _, t_local = obtener_tiempo_actual()
             dia_actual = t_local[7]
         except Exception:
@@ -198,7 +198,7 @@ class ITVManager:
                     partes = linea.strip().split()
                     if len(partes) >= 2:
                         ts_str = partes[1]
-                        from tiempo import parsear_timestamp
+                        from tiempo_satelites import parsear_timestamp
                         ts_unix = parsear_timestamp(ts_str)
                         if ts_unix and ts_unix > 0:
                             segundos = utc_actual - ts_unix
@@ -567,7 +567,7 @@ def main():
     print("=" * 50)
 
     try:
-        from tiempo import obtener_unix_utc_real
+        from tiempo_satelites import obtener_unix_utc_real
         utc = obtener_unix_utc_real()
     except Exception:
         import time

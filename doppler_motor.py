@@ -3,7 +3,7 @@
 # =========================================================================
 
 import json
-import datos_satelites
+from tiempo_satelites import obtener_objeto_satelite
 
 from logger import log_debug
 from config_system import obtener_config
@@ -31,7 +31,7 @@ _GANANCIA_BAJA = 0x96   # <-- Forzado al máximo siempre hasta recibir el primer
 
 
 def calcular_parametros_satelite(utc_actual_segundos):
-    sat_objeto = datos_satelites.obtener_objeto_satelite(utc_actual_segundos)
+    sat_objeto = obtener_objeto_satelite(utc_actual_segundos)
 
     if sat_objeto is None:
         # Sin pase activo: devolver parámetros base en MHz (misma unidad que

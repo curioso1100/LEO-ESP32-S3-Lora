@@ -4,9 +4,9 @@
 
 import os
 import json
+import time
 
 from config_system import obtener_config
-from tiempo import obtener_tiempo_actual
 
 
 def _debug_activo():
@@ -39,9 +39,9 @@ def _max_errores_email_chars():
 
 def _timestamp_iso():
     try:
-        utc_unix, reloj_str, t_local = obtener_tiempo_actual()
-        return "{:04d}-{:02d}-{:02d}T{}".format(
-            t_local[0], t_local[1], t_local[2], reloj_str)
+        t = time.localtime()
+        return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}".format(
+            t[0], t[1], t[2], t[3], t[4], t[5])
     except Exception:
         return "????-??-??T??:??:??"
 
@@ -84,6 +84,7 @@ def _rotar_si_necesario(fichero, max_lineas):
         lineas = _contar_lineas_fichero(fichero)
         if lineas >= max_lineas:
             import uos
+            import time
             try:
                 uos.remove(fichero + ".old")
             except OSError:

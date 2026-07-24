@@ -236,7 +236,6 @@
   "ventilador_activo": true,
   "ventilador_umbral_on_c": 48,
   "ventilador_umbral_off_c": 44,
-  "pre_lna_offset_db": 23.0,
   "seguridad_hardware": {
     "timeout_red_segundos": 20,
     "max_intentos_wifi": 10,

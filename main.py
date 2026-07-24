@@ -1,7 +1,7 @@
 # =========================================================================
 # SCRIPT PRINCIPAL: main.py (Versión Modularizada)
 # =========================================================================
-from estado import leer_fase
+from config_system import leer_fase
 
 # Leer la fase activa al arrancar el microcontrolador
 fase = leer_fase()
