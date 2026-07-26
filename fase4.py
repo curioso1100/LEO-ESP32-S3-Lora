@@ -15,7 +15,8 @@ from logger import (
     leer_estado_pendiente, borrar_estado_pendiente
 )
 from red import conectar_wifi, apagar_wifi, sincronizar_ntp
-from tiempo_satelites import obtener_unix_utc_real, obtener_horas_pendientes_estado
+from tiempo_satelites import obtener_tiempo_actual, obtener_unix_utc_real
+from alertas import obtener_horas_pendientes_estado
 
 CONFIG = obtener_config()
 DEBUG_MODO = CONFIG.get("debug_consola", True)
@@ -301,7 +302,7 @@ def enviar_email_estado(estado_pendiente):
 # =========================================================================
 
 def _enviar_email_itv_pendiente():
-    # Detecta y envía email ITV pendiente via alertas.py. Se llama DESPUES de conectar WiFi, retorna True si se envió, False si no había pendiente o falló
+    # Detecta y envía email ITV pendiente via alertas.py. Retorna True si se envió, False si no había pendiente o falló
     try:
         from itv_manager import ITVManager
         gc.collect()

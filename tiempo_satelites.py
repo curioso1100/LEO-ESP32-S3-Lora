@@ -1,9 +1,5 @@
 # =========================================================================
 # MÓDULO: tiempo_satelites.py
-# FUSIÓN A.4: tiempo.py + datos_satelites.py
-# Fecha refactor: 2026-07-24
-# =========================================================================
-# Resuelve el import circular: tiempo.py ↔ datos_satelites.py
 # =========================================================================
 
 import time
@@ -39,9 +35,6 @@ CONFIG = obtener_config()
 # =========================================================================
 # FUNCIONES DE TIEMPO (antes en tiempo.py)
 # =========================================================================
-
-_EPOCH_OFFSET = 946684800   # Diferencia entre epoch MicroPython (2000) y Unix (1970)
-
 
 def obtener_unix_utc_real():
     # Devuelve timestamp Unix real (epoch 1970) compensando el offset de MicroPython
@@ -120,14 +113,6 @@ def formatear_fecha_utc(timestamp):
 # FUNCIONES DE SATÉLITES (antes en datos_satelites.py)
 # =========================================================================
 
-CONFIG = obtener_config()
-
-FILE_AGENDA = "agenda.json"
-
-_OFFSET_VERANO_S  = 7200   # UTC+2 (CEST)
-_OFFSET_INVIERNO_S = 3600  # UTC+1 (CET)
-
-
 def obtener_desfase_espana(timestamp_utc):
     # Devuelve el desfase en segundos (7200 en verano, 3600 en invierno) calculando el ultimo domingo de marzo y octubre segun la norma europea
     tupla_utc = time.localtime(timestamp_utc)
@@ -136,21 +121,16 @@ def obtener_desfase_espana(timestamp_utc):
     t_marzo31   = time.mktime((ano, 3, 31, 1, 0, 0, 0, 0, 0)) - 946684800
     w_marzo     = time.localtime(t_marzo31 + 946684800)
     ultimo_domingo_marzo  = 31 - ((w_marzo[6] + 1) % 7)
-    limite_verano = time.mktime((ano, 3, ultimo_domingo_marzo, 1, 0, 0, 0, 0, 0))
+    limite_verano = time.mktime((ano, ultimo_domingo_marzo, 1, 0, 0, 0, 0, 0))
 
     t_octubre31  = time.mktime((ano, 10, 31, 1, 0, 0, 0, 0, 0)) - 946684800
     w_octubre    = time.localtime(t_octubre31 + 946684800)
     ultimo_domingo_octubre = 31 - ((w_octubre[6] + 1) % 7)
-    limite_invierno = time.mktime((ano, 10, ultimo_domingo_octubre, 1, 0, 0, 0, 0, 0))
+    limite_invierno = time.mktime((ano, ultimo_domingo_octubre, 1, 0, 0, 0, 0, 0))
 
     if limite_verano <= timestamp_utc < limite_invierno:
         return _OFFSET_VERANO_S
     return _OFFSET_INVIERNO_S
-
-
-_DOPPLER_BAJO_HZ  =  3000   # elevacion < 20deg
-_DOPPLER_MEDIO_HZ =  6000   # 20deg <= elevacion <= 60deg
-_DOPPLER_ALTO_HZ  =  9000   # elevacion > 60deg
 
 
 def _resolver_parametros_lora(info, grupo_data, c):
@@ -164,114 +144,6 @@ def _resolver_parametros_lora(info, grupo_data, c):
         "sw": int(res("lora_sync_word", 18)),
         "pr": int(res("lora_preamble_len", 8)),
     }
-
-
-def _calcular_horas_estado_automaticas(pases_ordenados, desfase_segundos):
-    """
-    Recibe lista de pases ordenados por utc_ini_timestamp.
-    Devuelve lista de strings "HH:MM" con las horas de envio de estado.
-
-    Logica:
-    - Inicializa lista vacia.
-    - Recorre pases detectando superposiciones (grupos).
-    - Para cada grupo, toma el utc_fin del ULTIMO pase del grupo.
-    - Comprueba hueco hasta el inicio del siguiente grupo/pase.
-    - Si hueco >= 15 minutos: anade (utc_fin_ultimo + 5 min) formateado.
-    """
-    if not pases_ordenados:
-        return []
-
-    horas_estado = []
-    n = len(pases_ordenados)
-    i = 0
-
-    while i < n:
-        utc_fin_grupo = pases_ordenados[i]["utc_ini_timestamp"] + pases_ordenados[i]["duracion_min"] * 60
-        j = i + 1
-
-        while j < n:
-            utc_ini_sig = pases_ordenados[j]["utc_ini_timestamp"]
-            if utc_ini_sig < utc_fin_grupo:
-                utc_fin_sig = pases_ordenados[j]["utc_ini_timestamp"] + pases_ordenados[j]["duracion_min"] * 60
-                if utc_fin_sig > utc_fin_grupo:
-                    utc_fin_grupo = utc_fin_sig
-                j += 1
-            else:
-                break
-
-        if j < n:
-            utc_ini_siguiente = pases_ordenados[j]["utc_ini_timestamp"]
-            hueco_segundos = utc_ini_siguiente - utc_fin_grupo
-
-            if hueco_segundos >= 15 * 60:  # al menos 15 minutos
-                hora_envio_utc = utc_fin_grupo + 5 * 60  # +5 minutos
-                hora_local = hora_envio_utc + desfase_segundos
-                t_local = time.localtime(hora_local)
-                hora_str = "{:02d}:{:02d}".format(t_local[3], t_local[4])
-                horas_estado.append(hora_str)
-                log_debug("ESTADO_AUTO", "Hueco {} min -> hora estado: {}".format(
-                    hueco_segundos // 60, hora_str))
-            else:
-                log_debug("ESTADO_AUTO", "Hueco {} min (insuficiente, < 15)".format(
-                    hueco_segundos // 60))
-
-        i = j  # Saltar al siguiente grupo
-
-    return horas_estado
-
-
-def _guardar_config_con_horas_estado(horas_estado):
-    #  Reescribe SOLO la linea email_estado_horas_fijas preservando el formato original del config.json. Usa write() en lugar de writelines() (no disponible en MicroPython)
-    CONFIG_FILE = "config.json"
-    BACKUP_FILE = "config.json.bak"
-
-    try:
-        with open(CONFIG_FILE, "r") as f:
-            lineas = f.readlines()
-
-        try:
-            with open(BACKUP_FILE, "w") as fb:
-                fb.write("".join(lineas))
-        except Exception as e_bak:
-            log_warn("ESTADO_AUTO", "No se pudo crear backup: {}".format(e_bak))
-
-        if horas_estado:
-            horas_formateadas = ", ".join(['"{}"'.format(h) for h in horas_estado])
-            nueva_linea = '  "email_estado_horas_fijas": [ {} ],\n'.format(horas_formateadas)
-        else:
-            nueva_linea = '  "email_estado_horas_fijas": [],\n'
-
-        indice_encontrado = -1
-        for idx, linea in enumerate(lineas):
-            if '"email_estado_horas_fijas"' in linea:
-                indice_encontrado = idx
-                break
-
-        if indice_encontrado < 0:
-            log_error("ESTADO_AUTO", "No se encontro la linea email_estado_horas_fijas en config.json")
-            return False
-
-        lineas[indice_encontrado] = nueva_linea
-
-        contenido = "".join(lineas)
-        with open(CONFIG_FILE, "w") as f:
-            f.write(contenido)
-
-        log_info("ESTADO_AUTO", "config.json actualizado. Horas: {}".format(horas_estado))
-        return True
-
-    except Exception as e:
-        log_error("ESTADO_AUTO", "Fallo actualizando config.json: {}".format(e))
-        try:
-            if BACKUP_FILE in os.listdir():
-                with open(BACKUP_FILE, "r") as fb:
-                    backup_contenido = fb.read()
-                with open(CONFIG_FILE, "w") as fo:
-                    fo.write(backup_contenido)
-                log_warn("ESTADO_AUTO", "config.json restaurado desde backup")
-        except Exception as e_restore:
-            log_error("ESTADO_AUTO", "No se pudo restaurar backup: {}".format(e_restore))
-        return False
 
 
 def descargar_agenda_completa(fecha_hoy):
@@ -423,10 +295,14 @@ def descargar_agenda_completa(fecha_hoy):
 
         email_estado_automatico = c.get("email_estado_automatico", False)
         if email_estado_automatico:
-            log_info("ESTADO_AUTO", "Modo automatico activado. Calculando horas de estado...")
-            desfase_actual = obtener_desfase_espana(int(time.time()))
-            horas_estado = _calcular_horas_estado_automaticas(pases_consolidados, desfase_actual)
-            _guardar_config_con_horas_estado(horas_estado)
+            try:
+                from alertas import _calcular_horas_estado_automaticas, _guardar_config_con_horas_estado
+                log_info("ESTADO_AUTO", "Modo automatico activado. Calculando horas de estado...")
+                desfase_actual = obtener_desfase_espana(int(time.time()))
+                horas_estado = _calcular_horas_estado_automaticas(pases_consolidados, desfase_actual)
+                _guardar_config_con_horas_estado(horas_estado)
+            except Exception as e_alert:
+                log_warn("ESTADO_AUTO", "No se pudo calcular horas automaticas: {}".format(e_alert))
         else:
             log_debug("ESTADO_AUTO", "Modo automatico desactivado. Sin cambios en horas de estado.")
 
@@ -483,10 +359,7 @@ def descargar_agenda_completa(fecha_hoy):
 
 
 def obtener_objeto_satelite(utc_api_actual, debug_activo=True):
-    """
-    Busca si hay un satelite activo en el cielo basandose estrictamente
-    en marcas de tiempo Unix.
-    """
+    # Busca si hay un satelite activo en el cielo basandose estrictamente en marcas de tiempo Unix.
     try:
         with open(FILE_AGENDA, "r") as archivo_test:
             agenda_local = json.load(archivo_test)
@@ -501,70 +374,6 @@ def obtener_objeto_satelite(utc_api_actual, debug_activo=True):
         if ts_inicio <= utc_api_actual <= ts_fin:
             return p
     return None
-
-
-def obtener_horas_pendientes_estado():
-    """ Devuelve lista de horas fijas de estado pendientes de envio.
-    Gestiona correctamente el cruce de medianoche en la lista de horas."""
-    horas_fijas = CONFIG.get("email_estado_horas_fijas", [])
-    if not horas_fijas:
-        return []
-
-    utc_unix, _, t_local = obtener_tiempo_actual()
-    hora_actual_min = t_local[3] * 60 + t_local[4]  # minutos desde 00:00
-
-    horas_min = []
-    for h_str in horas_fijas:
-        try:
-            partes = h_str.split(":")
-            h = int(partes[0])
-            m = int(partes[1])
-            horas_min.append((h * 60 + m, h_str))
-        except (ValueError, IndexError):
-            continue
-
-    if not horas_min:
-        return []
-
-    horas_hoy = []
-    horas_manana = []
-    idx_salto = None
-
-    for i in range(1, len(horas_min)):
-        if horas_min[i][0] < horas_min[i-1][0]:
-            idx_salto = i
-            break
-
-    if idx_salto is not None:
-        horas_hoy = horas_min[:idx_salto]
-        horas_manana = horas_min[idx_salto:]
-    else:
-        horas_hoy = horas_min[:]
-        horas_manana = []
-
-    primera_hora_min = horas_min[0][0]
-    es_hoy = (hora_actual_min >= primera_hora_min)
-
-    pendientes = []
-
-    if es_hoy:
-        encontrada_en_hoy = False
-        for minutos, h_str in horas_hoy:
-            if minutos > hora_actual_min:
-                pendientes.append(h_str)
-                encontrada_en_hoy = True
-            elif encontrada_en_hoy:
-                pendientes.append(h_str)
-
-        for minutos, h_str in horas_manana:
-            pendientes.append(h_str)
-
-    else:
-        for minutos, h_str in horas_manana:
-            if minutos > hora_actual_min:
-                pendientes.append(h_str)
-
-    return pendientes
 
 
 if __name__ == "__main__":
@@ -586,6 +395,7 @@ if __name__ == "__main__":
 
     if ssid:
         print(f"[DIAGNOSTICO RED] Conectando a SSID: '{ssid}'...")
+        import network
         wlan = network.WLAN(network.STA_IF)
         try:
             if wlan.isconnected():

@@ -4,6 +4,7 @@
 import gc
 import json
 import time
+import os
 
 from logger import log_info, log_debug, log_warn, log_error
 from config_system import obtener_config, version, nombre_proyecto
@@ -371,6 +372,181 @@ def enviar_email_itv(email_data, debug_activo=False):
     del asunto, cuerpo
     gc.collect()
     return exito
+
+
+# =========================================================================
+# HORAS DE ESTADO: Cálculo automático y pendientes
+# =========================================================================
+
+def _calcular_horas_estado_automaticas(pases_ordenados, desfase_segundos):
+    """
+    Recibe lista de pases ordenados por utc_ini_timestamp.
+    Devuelve lista de strings "HH:MM" con las horas de envio de estado.
+
+    Logica:
+    - Inicializa lista vacia.
+    - Recorre pases detectando superposiciones (grupos).
+    - Para cada grupo, toma el utc_fin del ULTIMO pase del grupo.
+    - Comprueba hueco hasta el inicio del siguiente grupo/pase.
+    - Si hueco >= 15 minutos: anade (utc_fin_ultimo + 5 min) formateado.
+    """
+    if not pases_ordenados:
+        return []
+
+    horas_estado = []
+    n = len(pases_ordenados)
+    i = 0
+
+    while i < n:
+        utc_fin_grupo = pases_ordenados[i]["utc_ini_timestamp"] + pases_ordenados[i]["duracion_min"] * 60
+        j = i + 1
+
+        while j < n:
+            utc_ini_sig = pases_ordenados[j]["utc_ini_timestamp"]
+            if utc_ini_sig < utc_fin_grupo:
+                utc_fin_sig = pases_ordenados[j]["utc_ini_timestamp"] + pases_ordenados[j]["duracion_min"] * 60
+                if utc_fin_sig > utc_fin_grupo:
+                    utc_fin_grupo = utc_fin_sig
+                j += 1
+            else:
+                break
+
+        if j < n:
+            utc_ini_siguiente = pases_ordenados[j]["utc_ini_timestamp"]
+            hueco_segundos = utc_ini_siguiente - utc_fin_grupo
+
+            if hueco_segundos >= 15 * 60:  # al menos 15 minutos
+                hora_envio_utc = utc_fin_grupo + 5 * 60  # +5 minutos
+                hora_local = hora_envio_utc + desfase_segundos
+                t_local = time.localtime(hora_local)
+                hora_str = "{:02d}:{:02d}".format(t_local[3], t_local[4])
+                horas_estado.append(hora_str)
+                log_debug("ESTADO_AUTO", "Hueco {} min -> hora estado: {}".format(
+                    hueco_segundos // 60, hora_str))
+            else:
+                log_debug("ESTADO_AUTO", "Hueco {} min (insuficiente, < 15)".format(
+                    hueco_segundos // 60))
+
+        i = j  # Saltar al siguiente grupo
+
+    return horas_estado
+
+
+def _guardar_config_con_horas_estado(horas_estado):
+    #  Reescribe SOLO la linea email_estado_horas_fijas preservando el formato original del config.json. Usa write() en lugar de writelines() (no disponible en MicroPython)
+    CONFIG_FILE = "config.json"
+    BACKUP_FILE = "config.json.bak"
+
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            lineas = f.readlines()
+
+        try:
+            with open(BACKUP_FILE, "w") as fb:
+                fb.write("".join(lineas))
+        except Exception as e_bak:
+            log_warn("ESTADO_AUTO", "No se pudo crear backup: {}".format(e_bak))
+
+        if horas_estado:
+            horas_formateadas = ", ".join(['"{}"'.format(h) for h in horas_estado])
+            nueva_linea = '  "email_estado_horas_fijas": [ {} ],\n'.format(horas_formateadas)
+        else:
+            nueva_linea = '  "email_estado_horas_fijas": [],\n'
+
+        indice_encontrado = -1
+        for idx, linea in enumerate(lineas):
+            if '"email_estado_horas_fijas"' in linea:
+                indice_encontrado = idx
+                break
+
+        if indice_encontrado < 0:
+            log_error("ESTADO_AUTO", "No se encontro la linea email_estado_horas_fijas en config.json")
+            return False
+
+        lineas[indice_encontrado] = nueva_linea
+
+        contenido = "".join(lineas)
+        with open(CONFIG_FILE, "w") as f:
+            f.write(contenido)
+
+        log_info("ESTADO_AUTO", "config.json actualizado. Horas: {}".format(horas_estado))
+        return True
+
+    except Exception as e:
+        log_error("ESTADO_AUTO", "Fallo actualizando config.json: {}".format(e))
+        try:
+            if BACKUP_FILE in os.listdir():
+                with open(BACKUP_FILE, "r") as fb:
+                    backup_contenido = fb.read()
+                with open(CONFIG_FILE, "w") as fo:
+                    fo.write(backup_contenido)
+                log_warn("ESTADO_AUTO", "config.json restaurado desde backup")
+        except Exception as e_restore:
+            log_error("ESTADO_AUTO", "No se pudo restaurar backup: {}".format(e_restore))
+        return False
+
+
+def obtener_horas_pendientes_estado():
+    #  Devuelve lista de horas fijas de estado pendientes de envio. Gestiona correctamente el cruce de medianoche en la lista de horas
+    horas_fijas = CONFIG.get("email_estado_horas_fijas", [])
+    if not horas_fijas:
+        return []
+
+    utc_unix, _, t_local = obtener_tiempo_actual()
+    hora_actual_min = t_local[3] * 60 + t_local[4]  # minutos desde 00:00
+
+    horas_min = []
+    for h_str in horas_fijas:
+        try:
+            partes = h_str.split(":")
+            h = int(partes[0])
+            m = int(partes[1])
+            horas_min.append((h * 60 + m, h_str))
+        except (ValueError, IndexError):
+            continue
+
+    if not horas_min:
+        return []
+
+    horas_hoy = []
+    horas_manana = []
+    idx_salto = None
+
+    for i in range(1, len(horas_min)):
+        if horas_min[i][0] < horas_min[i-1][0]:
+            idx_salto = i
+            break
+
+    if idx_salto is not None:
+        horas_hoy = horas_min[:idx_salto]
+        horas_manana = horas_min[idx_salto:]
+    else:
+        horas_hoy = horas_min[:]
+        horas_manana = []
+
+    primera_hora_min = horas_min[0][0]
+    es_hoy = (hora_actual_min >= primera_hora_min)
+
+    pendientes = []
+
+    if es_hoy:
+        encontrada_en_hoy = False
+        for minutos, h_str in horas_hoy:
+            if minutos > hora_actual_min:
+                pendientes.append(h_str)
+                encontrada_en_hoy = True
+            elif encontrada_en_hoy:
+                pendientes.append(h_str)
+
+        for minutos, h_str in horas_manana:
+            pendientes.append(h_str)
+
+    else:
+        for minutos, h_str in horas_manana:
+            if minutos > hora_actual_min:
+                pendientes.append(h_str)
+
+    return pendientes
 
 
 if __name__ == "__main__":
