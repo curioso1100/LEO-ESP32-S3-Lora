@@ -38,7 +38,7 @@ def _comprobar_prg(radio, itv):
     # Gestiona el botón PRG. Única función: marcar ITV como realizada
     if placa.detectar_pulsacion_prg():
         log_warn("PRG", "Pulsacion PRG detectada -> marcando ITV realizada")
-        itv.marcar_itv_realizada(obtener_unix_utc_real(), "boton_prg_1pulso")
+        itv.marcar_itv_realizada(obtener_unix_utc_real(), "Boton PRG pulsado")
         placa.led_blink(5, pausa_ms=100)
 
 

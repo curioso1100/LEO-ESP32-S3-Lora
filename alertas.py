@@ -7,7 +7,7 @@ import time
 
 from logger import log_info, log_debug, log_warn, log_error
 from config_system import obtener_config, version, nombre_proyecto
-from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual
+from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual, formatear_fecha_utc
 
 CONFIG = obtener_config()
 
@@ -253,6 +253,124 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
             except Exception:
                 pass
         gc.collect()
+
+
+# =========================================================================
+# ITV: Construcción y envío de email de revisión periódica
+# =========================================================================
+
+_MIN_RAM_ENVIO_ITV = 22000
+
+
+def construir_email_itv(email_data):
+    # Construye asunto y cuerpo del email ITV a partir de datos preparados por ITVManager
+    motivos = email_data.get("motivos", [])
+    metricas = email_data.get("metricas", {})
+    checklist = email_data.get("checklist", [])
+    acciones = email_data.get("acciones", [])
+    dias = email_data.get("dias_desde_ultima_itv", 0)
+    timestamp = email_data.get("timestamp", 0)
+
+    asunto = "{}: ITV {} Revision periodica - {}".format(
+        nombre_proyecto(), version(),
+        "; ".join(motivos[:2]) if motivos else "rutinaria"
+    )
+
+    partes = [
+        "=" * 60,
+        "  I T V   -   R E V I S I O N   P E R I O D I C A   L E O {}".format(version()),
+        "=" * 60,
+        "",
+        "Fecha: {}".format(formatear_fecha_utc(timestamp)),
+        "Dias desde ultima ITV: {}".format(dias),
+        "",
+        "-" * 60,
+        "  MOTIVOS DE LA ALERTA",
+        "-" * 60,
+    ]
+    for m in motivos:
+        partes.append("  [!] {}".format(m))
+    partes.append("")
+
+    partes.extend([
+        "-" * 60,
+        "  METRICAS DEL SISTEMA",
+        "-" * 60,
+        "  Dias acumulados:        {}".format(metricas.get("dias_acumulados", "N/A")),
+        "  Heartbeats acumulados:  {}".format(metricas.get("heartbeats_acumulados", "N/A")),
+        "  Reinicios (7d):         {}".format(metricas.get("reinicios_7d", "N/A")),
+        "  Reinicios (total):      {}".format(metricas.get("reinicios_total", "N/A")),
+        "  Ventilador activ. (7d): {}".format(metricas.get("ventilador_activaciones_7d", "N/A")),
+        "  Temp max (7d):          {} C".format(metricas.get("temp_max_7d", "N/A")),
+        "  Temp max (30d):         {} C".format(metricas.get("temp_max_30d", "N/A")),
+        "  Capturas total (est):   {}".format(metricas.get("capturas_total_estimado", "N/A")),
+        "  Capturas (7d):          {}".format(metricas.get("capturas_7d", "N/A")),
+        "  Emails enviados (7d):   {}".format(metricas.get("emails_7d", "N/A")),
+        "",
+    ])
+
+    rssi_resumen = metricas.get("rssi_por_satelite", {})
+    if rssi_resumen:
+        partes.extend([
+            "-" * 60,
+            "  RSSI POR SATELITE",
+            "-" * 60,
+        ])
+        for sat, val in rssi_resumen.items():
+            partes.append("  {}: {}".format(sat, val))
+        partes.append("")
+
+    partes.extend([
+        "-" * 60,
+        "  CHECKLIST FISICO (marcar al bajar la placa)",
+        "-" * 60,
+    ])
+    for i, item in enumerate(checklist, 1):
+        partes.append("  [{}] {}".format(i, item))
+    partes.append("")
+
+    partes.extend([
+        "-" * 60,
+        "  ACCIONES POSIBLES",
+        "-" * 60,
+    ])
+    for i, acc in enumerate(acciones, 1):
+        partes.append("  {}. {}".format(i, acc))
+    partes.append("")
+
+    partes.extend([
+        "=" * 60,
+        "Para marcar ITV como REALIZADA y resetear contadores:",
+        "  1. Baja la placa del techo",
+        "  2. Revisa el checklist fisico",
+        "  3. Pulsa PRG 1 vez en modo fase3",
+        "  4. Sube la placa de nuevo",
+        "=" * 60,
+    ])
+
+    return asunto, "\n".join(partes)
+
+
+def enviar_email_itv(email_data, debug_activo=False):
+    # Construye y envía email ITV via SMTP. Retorna True/False
+    asunto, cuerpo = construir_email_itv(email_data)
+
+    if gc.mem_free() < _MIN_RAM_ENVIO_ITV:
+        log_warn("ITV_ALERT", "RAM insuficiente para email ITV ({} < {} bytes)".format(
+            gc.mem_free(), _MIN_RAM_ENVIO_ITV))
+        del asunto, cuerpo
+        gc.collect()
+        return False
+
+    exito = enviar_correo_bloques(
+        asunto,
+        modo_reporte=False,
+        texto_telemetria=cuerpo,
+        debug_activo=debug_activo
+    )
+    del asunto, cuerpo
+    gc.collect()
+    return exito
 
 
 if __name__ == "__main__":

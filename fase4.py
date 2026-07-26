@@ -5,7 +5,6 @@
 
 import machine
 import time
-import json
 import os
 import gc
 
@@ -16,8 +15,7 @@ from logger import (
     leer_estado_pendiente, borrar_estado_pendiente
 )
 from red import conectar_wifi, apagar_wifi, sincronizar_ntp
-from tiempo_satelites import obtener_tiempo_actual, obtener_unix_utc_real, formatear_fecha_utc
-from tiempo_satelites import obtener_horas_pendientes_estado
+from tiempo_satelites import obtener_unix_utc_real, obtener_horas_pendientes_estado
 
 CONFIG = obtener_config()
 DEBUG_MODO = CONFIG.get("debug_consola", True)
@@ -303,7 +301,7 @@ def enviar_email_estado(estado_pendiente):
 # =========================================================================
 
 def _enviar_email_itv_pendiente():
-    # Detecta y envía email ITV pendiente. Se llama DESPUES de conectar WiFi. Retorna True si se envió, False si no había pendiente o falló
+    # Detecta y envía email ITV pendiente via alertas.py. Se llama DESPUES de conectar WiFi, retorna True si se envió, False si no había pendiente o falló
     try:
         from itv_manager import ITVManager
         gc.collect()
@@ -321,107 +319,15 @@ def _enviar_email_itv_pendiente():
 
     gc.collect()
 
-    motivos = email_data.get("motivos", [])
-    metricas = email_data.get("metricas", {})
-    checklist = email_data.get("checklist", [])
-    acciones = email_data.get("acciones", [])
-    dias = email_data.get("dias_desde_ultima_itv", 0)
-
-    # Construir asunto
-    asunto = "{}: ITV {} Revision periodica - {}".format(nombre_proyecto(), version(),"; ".join(motivos[:2]) if motivos else "rutinaria")
-
-    # Construir cuerpo
-    partes = [
-        "=" * 60,
-        "  I T V   -   R E V I S I O N   P E R I O D I C A   L E O {}".format(version()),
-        "=" * 60,
-        "",
-        "Fecha: {}".format(formatear_fecha_utc(email_data.get("timestamp", 0))),
-        "Dias desde ultima ITV: {}".format(dias),
-        "",
-        "-" * 60,
-        "  MOTIVOS DE LA ALERTA",
-        "-" * 60,
-    ]
-    for m in motivos:
-        partes.append("  [!] {}".format(m))
-    partes.append("")
-
-    partes.extend([
-        "-" * 60,
-        "  METRICAS DEL SISTEMA",
-        "-" * 60,
-        "  Dias acumulados:        {}".format(metricas.get("dias_acumulados", "N/A")),
-        "  Heartbeats acumulados:  {}".format(metricas.get("heartbeats_acumulados", "N/A")),
-        "  Reinicios (7d):         {}".format(metricas.get("reinicios_7d", "N/A")),
-        "  Reinicios (total):      {}".format(metricas.get("reinicios_total", "N/A")),
-        "  Ventilador activ. (7d): {}".format(metricas.get("ventilador_activaciones_7d", "N/A")),
-        "  Temp max (7d):          {} C".format(metricas.get("temp_max_7d", "N/A")),
-        "  Temp max (30d):         {} C".format(metricas.get("temp_max_30d", "N/A")),
-        "  Capturas total (est):   {}".format(metricas.get("capturas_total_estimado", "N/A")),
-        "  Capturas (7d):          {}".format(metricas.get("capturas_7d", "N/A")),
-        "  Emails enviados (7d):   {}".format(metricas.get("emails_7d", "N/A")),
-        "",
-    ])
-
-    rssi_resumen = metricas.get("rssi_por_satelite", {})
-    if rssi_resumen:
-        partes.extend([
-            "-" * 60,
-            "  RSSI POR SATELITE",
-            "-" * 60,
-        ])
-        for sat, val in rssi_resumen.items():
-            partes.append("  {}: {}".format(sat, val))
-        partes.append("")
-
-    partes.extend([
-        "-" * 60,
-        "  CHECKLIST FISICO (marcar al bajar la placa)",
-        "-" * 60,
-    ])
-    for i, item in enumerate(checklist, 1):
-        partes.append("  [{}] {}".format(i, item))
-    partes.append("")
-
-    partes.extend([
-        "-" * 60,
-        "  ACCIONES POSIBLES",
-        "-" * 60,
-    ])
-    for i, acc in enumerate(acciones, 1):
-        partes.append("  {}. {}".format(i, acc))
-    partes.append("")
-
-    partes.extend([
-        "=" * 60,
-        "Para marcar ITV como REALIZADA y resetear contadores:",
-        "  1. Baja la placa del techo",
-        "  2. Revisa el checklist fisico",
-        "  3. Pulsa PRG 3 veces seguidas (cada <1s) en modo fase3",
-        "  4. Sube la placa de nuevo",
-        "=" * 60,
-    ])
-
-    cuerpo = "\n".join(partes)
-
-    if gc.mem_free() < _MIN_RAM_ENVIO:
-        log_warn("ITV_F4", "RAM insuficiente para email ITV ({} < {} bytes)".format(
-            gc.mem_free(), _MIN_RAM_ENVIO))
-        del cuerpo, partes, email_data
-        gc.collect()
-        return False
-
-    exito = _enviar_email_smtp(asunto, cuerpo, DEBUG_MODO)
-    del cuerpo, partes, email_data
-    gc.collect()
+    import alertas
+    exito = alertas.enviar_email_itv(email_data, DEBUG_MODO)
 
     if exito:
         log_info("ITV_F4", "Email ITV enviado correctamente")
-        return True
     else:
         log_warn("ITV_F4", "Fallo enviando email ITV. Se reintentara en proximo ciclo.")
-        return False
+
+    return exito
 
 
 # =========================================================================

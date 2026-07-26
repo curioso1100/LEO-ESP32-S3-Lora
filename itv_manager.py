@@ -19,7 +19,7 @@
 #
 # 3. MARCAR ITV REALIZADA (boton PRG o consola):
 #    >>> itv.marcar_itv_realizada(obtener_unix_utc_real(), "revision_ok")
-#    # O en fase3: pulsa PRG 3 veces cortas (<1s cada una, en 5s)
+#    # O en fase3: pulsa PRG 1 vez
 #
 # 4. FICHEROS ITV EN FLASH:
 #    - itv_estado.json          : Metricas acumuladas (NO borrar)
@@ -70,8 +70,7 @@ DEFAULT_UMBRALES = {
 # =========================================================================
 
 class ITVManager:
-    """Gestiona la lógica de mantenimiento preventivo de la estación LEO."""
-
+    # Gestiona la lógica de mantenimiento preventivo de la estación LEO
     def __init__(self, config=None):
         self._cfg = config or {}
         self._umbrales = self._cargar_umbrales()
@@ -497,33 +496,11 @@ class ITVManager:
         log_info("ITV", "ITV realizada. Motivo: {}".format(motivo))
 
     def forzar_itv(self, utc_actual, motivo='forzado_manual'):
+        # Prepara email ITV pendiente. NO orquesta transición de fase
         self._itv_pendiente = True
         self._motivo_itv = [motivo]
         self._preparar_email_itv(utc_actual, [motivo], 0)
-        # Crear estado_pendiente.json para forzar transicion a fase4
-        try:
-            estado_minimo = {
-                "tipo": "estado",
-                "timestamp": utc_actual,
-                "heartbeats": [],
-                "capturas_count": 0,
-                "capturas": [],
-                "temp_cpu": None,
-                "ventilador_on": False,
-                "fs_libre_kb": None,
-                "paquetes_capturados": 0,
-                "paquetes_descartados": 0,
-                "errores": ""
-            }
-            with open("estado_pendiente.json", "w") as f:
-                json.dump(estado_minimo, f)
-                f.flush()
-                os.sync()
-            from config_system import guardar_fase
-            guardar_fase(4)
-            log_warn("ITV", "ITV forzada: {} -> estado_pendiente + fase4 preparados".format(motivo))
-        except Exception as e:
-            log_warn("ITV", "ITV forzada: {} (no se pudo preparar fase4: {})".format(motivo, e))
+        log_warn("ITV", "ITV forzada: {} -> email ITV preparado".format(motivo))
 
     # ------------------------------------------------------------------
     # Estado para debug / heartbeat
@@ -561,7 +538,7 @@ class ITVManager:
 # =========================================================================
 
 def main():
-    """Forzar ITV manualmente desde consola."""
+    # Forzar ITV manualmente desde consola
     print("=" * 50)
     print("FORZAR ITV - ITVManager")
     print("=" * 50)
@@ -586,8 +563,13 @@ def main():
     print("Estado:", itv.resumen_compacto())
     print("Email ITV pendiente:", itv.hay_email_itv_pendiente())
     print("")
-    print("La placa enviara el email ITV en el proximo ciclo de fase4.")
-    print("Para enviar inmediatamente, reinicia la placa (machine.reset())")
+    print("Para que la placa envie el email ITV:")
+    print("  1. Desde fase3: espera a que evaluar() detecte la ITV,")
+    print("     o pulsa PRG 1 vez para marcarla realizada.")
+    print("  2. Desde consola: ejecuta:")
+    print("     >>> from config_system import guardar_fase")
+    print("     >>> guardar_fase(4)")
+    print("     >>> import machine; machine.reset()")
     print("=" * 50)
 
 
