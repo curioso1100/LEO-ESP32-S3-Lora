@@ -2,7 +2,6 @@
 # MÓDULO: fase3_utils.py - Funciones auxiliares del bucle principal
 # =========================================================================
 
-
 import time
 import json
 import gc
@@ -10,17 +9,17 @@ import os
 
 from logger import (
     log_info, log_debug, log_warn, log_exception, log_persistente,
-    escribir_captura, escribir_heartbeat, leer_errores_para_email
+    escribir_captura, leer_errores_para_email
 )
 from tiempo_satelites import obtener_tiempo_actual
-from config_system import guardar_fase
 
 
 # =========================================================================
 # AGENDA
 # =========================================================================
 
-def verificar_agenda_o_reiniciar(radio, t_local):
+def agenda_caducada(t_local):
+    # Devuelve True si la agenda no corresponde al dia actual
     try:
         fecha_actual_str = "{:04d}-{:02d}-{:02d}".format(t_local[0], t_local[1], t_local[2])
         with open("agenda.json", "r") as aj_check:
@@ -28,13 +27,11 @@ def verificar_agenda_o_reiniciar(radio, t_local):
         gc.collect()
         if agenda.get("fecha_creacion", "") != fecha_actual_str:
             log_warn("AGENDA", "Fecha caducada ({}) -> regenerando".format(fecha_actual_str))
-            guardar_fase(1)
-            radio.standby()
-            time.sleep_ms(500)
-            from placa import reiniciar
-            reiniciar()
+            return True
+        return False
     except Exception as e:
         log_exception("AGENDA", e)
+        return False
 
 
 def mostrar_proximos_pases(utc_actual, reloj_str):
@@ -113,7 +110,6 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
 
             sat_nombre_detectado = identificador.identificar(datos_raw)
 
-            # Desambiguación por familia de header + pase activo
             if sat_objeto is not None and sat_nombre_detectado is not None:
                 sat_activo = sat_objeto["satelite"]["nombre"]
                 if identificador.misma_familia(sat_nombre_detectado, sat_activo):
@@ -136,7 +132,6 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                     if frec_nom is not None:
                         radio.forzar_frecuencia(frec_nom)
             else:
-                # FIX: No atribuir al satélite del pase cuando no hay coincidencia
                 sat_nombre = "DESCONOCIDO"
 
             buscar_activo = sweep._debe_buscar(sat_objeto)
@@ -192,19 +187,15 @@ def contar_capturas_pendientes(fichero="satelites_cazados.txt"):
         return 0
 
 
-def enviar_email_estado(email, temp_cpu, ventilador_on, fs_libre_kb,
-                         paquetes_capturados, paquetes_descartados):
+def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
+                               paquetes_capturados, paquetes_descartados):
+    # Construye estado_pendiente.json. NO llama guardar_fase()
     log_debug('EMAIL', 'Preparando estado pendiente para fase4...')
     hb_lines = leer_ultimos_heartbeats()
     hb_count = len(hb_lines)
-    print("[EMAIL-DEBUG] === enviar_email_estado() === HB={} CAP={}".format(
+    print("[EMAIL-DEBUG] === preparar_estado_pendiente() === HB={} CAP={}".format(
         hb_count, contar_capturas_pendientes()))
 
-    if not email._horas_fijas and email._email_cada_seg <= 0:
-        print("[EMAIL-DEBUG] EMAIL:OFF - ambos mecanismos desactivados")
-        return True
-
-    email.marcar_enviado()
     capturas = []
     try:
         with open("satelites_cazados.txt", "r") as f:
@@ -251,45 +242,26 @@ def enviar_email_estado(email, temp_cpu, ventilador_on, fs_libre_kb,
             f.flush()
             os.sync()
         gc.collect()
-        log_info("EMAIL", "Estado pendiente guardado ({} HB, {} CAP) -> transicionando a fase4".format(
+        log_info("EMAIL", "Estado pendiente guardado ({} HB, {} CAP)".format(
             hb_count, len(capturas)))
         if capturas:
             try:
                 os.remove("satelites_cazados.txt")
             except Exception:
                 pass
-        guardar_fase(4)
-        return True
+        return estado_pendiente
     except Exception as e:
         log_exception("EMAIL_ESTADO", e)
-        return False
-
-
-# =========================================================================
-# HEARTBEAT
-# =========================================================================
-
-def escribir_heartbeat_fase3(reloj_str, modo, radio, irq_delta, reinicios,
-                              sat_nombre, temp_cpu, ventilador_on, fs_libre_kb, heartbeat_activo=True):
-    escribir_heartbeat(
-        "heartbeat.log", reloj_str, modo, radio.frecuencia, radio.sf,
-        radio.bw, radio.cr, radio.sync_word, radio.crc_on, radio.rx_iq,
-        radio.ganancia, gc.mem_free(), irq_delta, reinicios,
-        sat_nombre, temp_cpu, ventilador_on, fs_libre_kb,
-        heartbeat_activo=heartbeat_activo
-    )
+        return None
 
 
 # =========================================================================
 # NTP
 # =========================================================================
 
-def sincronizar_ntp_si_necesario(cfg):
-    import time
+def ntp_requiere_sync():
+    # Devuelve True si el RTC indica ano < 2026 (corrupto)
     if time.localtime()[0] >= 2026:
-        return
-    log_warn("RTC", "RTC corrupto - transicionando a fase1 para sincronizar")
-    guardar_fase(1)
-    time.sleep_ms(500)
-    from placa import reiniciar
-    reiniciar()
+        return False
+    log_warn("RTC", "RTC corrupto - se requiere sincronizacion NTP")
+    return True

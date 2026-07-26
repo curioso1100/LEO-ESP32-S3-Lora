@@ -13,7 +13,7 @@ import placa
 from config_system import guardar_fase, obtener_config
 from logger import (
     log_info, log_debug, log_warn, log_error, log_exception,
-    rotar_logs_txt
+    rotar_logs_txt, escribir_heartbeat
 )
 from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual
 
@@ -82,13 +82,12 @@ def ejecutar():
     from sat_identifier import IdentificadorSat
     gc.collect()
     from fase3_utils import (
-        verificar_agenda_o_reiniciar,
+        agenda_caducada,
         mostrar_proximos_pases,
         mostrar_estado_pase,
         procesar_recepcion,
-        enviar_email_estado,
-        escribir_heartbeat_fase3,
-        sincronizar_ntp_si_necesario,
+        preparar_estado_pendiente,
+        ntp_requiere_sync,
     )
     gc.collect()
     from itv_manager import ITVManager
@@ -110,10 +109,12 @@ def ejecutar():
         else:
             log_warn("VENT", "No se pudo inicializar ventilador GPIO{}".format(cfg.ventilador_gpio))
             ventilador = None
-
     # NTP
-    sincronizar_ntp_si_necesario(cfg)
-
+    if ntp_requiere_sync():
+        log_warn("RTC", "RTC corrupto - transicionando a fase1 para sincronizar")
+        guardar_fase(1)
+        time.sleep_ms(500)
+        placa.reiniciar()
     # Radio
     params_ini = calcular_parametros_satelite(obtener_unix_utc_real())
     radio = RadioManager()
@@ -158,10 +159,13 @@ def ejecutar():
     sat_hb = sat_obj["satelite"]["nombre"] if sat_obj else "-"
     modo_hb = "PASE" if sat_obj else "BASE"
     irq_count_inicial = radio.irq_count
-
-    escribir_heartbeat_fase3(reloj_str, modo_hb, radio, 0, 0,
-                              sat_hb, temp, vent_on, fs_libre,
-                              heartbeat_activo=cfg.heartbeat_activo)
+    escribir_heartbeat(
+        "heartbeat.log", reloj_str, modo_hb, radio.frecuencia, radio.sf,
+        radio.bw, radio.cr, radio.sync_word, radio.crc_on, radio.rx_iq,
+        radio.ganancia, gc.mem_free(), 0, 0,
+        sat_hb, temp, vent_on, fs_libre,
+        heartbeat_activo=cfg.heartbeat_activo
+    )
     if cfg.debug:
         print("[HEARTBEAT] Inicial guardado (IRQ:{})".format(0))
 
@@ -194,7 +198,11 @@ def ejecutar():
             thonny_info_mostrada = True
 
         # Agenda
-        verificar_agenda_o_reiniciar(radio, t_local)
+        if agenda_caducada(t_local):
+            guardar_fase(1)
+            radio.standby()
+            time.sleep_ms(500)
+            placa.reiniciar()
 
         # Temperatura + ventilador
         temp = placa.leer_temperatura_cpu()
@@ -231,12 +239,15 @@ def ejecutar():
                 heartbeat_ciclos = 0
             else:
                 print(">>> FIN DE PASE - MODO BASE <<<")
+
                 if email.toca_enviar(t_local):
                     log_info("EMAIL", "DISPARANDO email de estado (fin de pase)!")
                     print("[EMAIL-DEBUG] DISPARANDO email de estado (fin de pase)!")
-                    if enviar_email_estado(email, temp, vent_on, fs_libre,
-                                            paquetes_capturados, paquetes_descartados):
+                    email.marcar_enviado()
+
+                    if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados) is not None:
                         email_enviado_este_ciclo = True
+                        guardar_fase(4)
                         _intentar_transicion_fase4(radio, itv)
 
                 mostrar_proximos_pases(utc, reloj_str)
@@ -285,10 +296,13 @@ def ejecutar():
         # --- Email periódico ---
         if email.toca_enviar(t_local):
             log_info("EMAIL", "DISPARANDO email de estado!")
-            if enviar_email_estado(email, temp, vent_on, fs_libre,
-                                    paquetes_capturados, paquetes_descartados):
+            print("[EMAIL-DEBUG] DISPARANDO email de estado!")
+            email.marcar_enviado()
+            
+            if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados) is not None:
                 email_enviado_este_ciclo = True
-                _intentar_transicion_fase4(radio, itv)
+                guardar_fase(4)
+                _intentar_transicion_fase4(radio, itv)            
 
         # --- Heartbeat ---
         heartbeat_ciclos += 1
@@ -297,9 +311,15 @@ def ejecutar():
             sat_hb = sat_obj["satelite"]["nombre"] if sat_obj else "-"
             modo_hb = "PASE" if sat_obj else "BASE"
             irq_delta = radio.irq_count - irq_count_inicial
-            escribir_heartbeat_fase3(reloj_str, modo_hb, radio, irq_delta, reinicios,
-                                      sat_hb, temp, vent_on, fs_libre,
-                                      heartbeat_activo=cfg.heartbeat_activo)
+
+            escribir_heartbeat(
+                "heartbeat.log", reloj_str, modo_hb, radio.frecuencia, radio.sf,
+                radio.bw, radio.cr, radio.sync_word, radio.crc_on, radio.rx_iq,
+                radio.ganancia, gc.mem_free(), irq_delta, reinicios,
+                sat_hb, temp, vent_on, fs_libre,
+                heartbeat_activo=cfg.heartbeat_activo
+            )
+            
             heartbeat_escrito_este_ciclo = True
             if cfg.debug:
                 print("[HEARTBEAT] Guardado en heartbeat.log (IRQ:{})".format(irq_delta))
