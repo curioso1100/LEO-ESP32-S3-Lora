@@ -234,7 +234,7 @@
   },
   "ventilador_gpio": 38,
   "ventilador_activo": true,
-  "ventilador_umbral_on_c": 48,
+  "ventilador_umbral_on_c": 49,
   "ventilador_umbral_off_c": 44,
   "seguridad_hardware": {
     "timeout_red_segundos": 20,
@@ -246,7 +246,7 @@
   "max_errores_log_kb": 100,
   "itv": {
     "dias_maximos": 90,
-    "ventilador_activaciones_7d": 3,
+    "ventilador_activaciones_7d": 15,
     "delta_temp_maxima_c": 5,
     "delta_rssi_db": 10,
     "reinicios_7d": 2,

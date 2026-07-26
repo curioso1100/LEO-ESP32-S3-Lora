@@ -35,48 +35,15 @@ _SLEEP_ESPERA_S = 30
 # =========================================================================
 
 def _comprobar_prg(radio, itv):
-    """Gestiona el botón PRG. Única función: marcar ITV como realizada.
-
-    Patrón: 3 pulsaciones cortas (<1s cada una) dentro de 5 segundos.
-    Si se detecta, marca ITV realizada, parpadea LED 5 veces y continúa.
-    """
-    if not placa.prg_pulsado():
-        return
-
-    pulsaciones = 1  # Ya estamos en la primera pulsación
-    t_inicio_ventana = time.ticks_ms()
-
-    # Esperar a que suelten el botón de la primera pulsación
-    while placa.prg_pulsado():
-        time.sleep_ms(50)
-    duracion_primera = time.ticks_diff(time.ticks_ms(), t_inicio_ventana)
-    if duracion_primera > 1000:
-        # Primera pulsación demasiado larga, no cuenta
-        return
-
-    while time.ticks_diff(time.ticks_ms(), t_inicio_ventana) < 5000:
-        if placa.prg_pulsado():
-            t_pulso = time.ticks_ms()
-            while placa.prg_pulsado():
-                time.sleep_ms(50)
-            dur = time.ticks_diff(time.ticks_ms(), t_pulso)
-            if dur > 1000:
-                # Pulsación larga detectada, resetear conteo
-                pulsaciones = 0
-                continue
-            pulsaciones += 1
-            if pulsaciones >= 3:
-                log_warn("PRG", "3 pulsaciones cortas detectadas -> marcando ITV realizada")
-                itv.marcar_itv_realizada(obtener_unix_utc_real(), "boton_prg_3pulsos")
-                placa.led_blink(5, pausa_ms=100)
-                return
-        time.sleep_ms(50)
-
-    log_debug("PRG", "Solo {} pulsacion(es) corta(s), ignorando".format(pulsaciones))
+    # Gestiona el botón PRG. Única función: marcar ITV como realizada
+    if placa.detectar_pulsacion_prg():
+        log_warn("PRG", "Pulsacion PRG detectada -> marcando ITV realizada")
+        itv.marcar_itv_realizada(obtener_unix_utc_real(), "boton_prg_1pulso")
+        placa.led_blink(5, pausa_ms=100)
 
 
 def _intentar_transicion_fase4(radio, itv=None):
-    """Verifica si se debe transicionar a fase4 y reinicia."""
+    # Verifica si se debe transicionar a fase4 y reinicia
     try:
         with open("estado.json", "r") as f:
             estado = json.load(f)
@@ -368,8 +335,7 @@ def ejecutar():
         # --- Sleep ---
         sleep_s = _SLEEP_PASE_ACTIVO_S if sat_obj is not None else _SLEEP_ESPERA_S
         for _ in range(sleep_s):
-            if placa.prg_pulsado():
-                _comprobar_prg(radio, itv)
+            _comprobar_prg(radio, itv)
             time.sleep(1)
 
 

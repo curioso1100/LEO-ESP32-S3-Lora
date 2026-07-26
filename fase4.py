@@ -9,7 +9,7 @@ import json
 import os
 import gc
 
-from placa import led_on, led_off, led_blink, reiniciar, prg_pulsado
+from placa import led_on, led_off, led_blink, reiniciar
 from config_system import guardar_fase, obtener_config, version, nombre_proyecto
 from logger import (
     log_info, log_debug, log_warn, log_error, log_exception,
@@ -41,7 +41,7 @@ def _borrar_logs_originales():
 
 
 def _fragmentar_capturas(capturas):
-    """Divide la lista de capturas en trozos que quepan en ~9KB de payload."""
+    # Divide la lista de capturas en trozos que quepan en ~9KB de payload
     if not capturas:
         return []
 
@@ -70,7 +70,7 @@ def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
                              temp_cpu, ventilador_on, fs_libre_kb, errores,
                              paquetes_capturados=0, paquetes_descartados=0,
                              horas_pendientes=None):
-    """Construye el cuerpo del Email 1: Estado + Heartbeats."""
+    # Construye el cuerpo del Email 1: Estado + Heartbeats
     partes = []
     partes.append("ESTADO DEL SISTEMA")
     partes.append("Heartbeats acumulados: {}".format(num_hb))
@@ -114,7 +114,7 @@ def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
 
 def _construir_email_capturas(trozo_capturas, num_trozo, total_trozos,
                                num_cap_total, linea_inicio, linea_fin):
-    """Construye el cuerpo de un email de capturas fragmentado."""
+    # Construye el cuerpo de un email de capturas fragmentado
     partes = []
     partes.append("=== CAPTURAS ACUMULADAS ({}) ===".format(num_cap_total))
     partes.append("Fragmento {} de {} -- lineas {} a {}".format(
@@ -125,7 +125,7 @@ def _construir_email_capturas(trozo_capturas, num_trozo, total_trozos,
 
 
 def _enviar_email_smtp(asunto, cuerpo, debug_activo):
-    """Envia un email via SMTP. Retorna True/False."""
+    # Envia un email via SMTP. Retorna True/False
     import alertas
     return alertas.enviar_correo_bloques(
         asunto,
@@ -303,10 +303,7 @@ def enviar_email_estado(estado_pendiente):
 # =========================================================================
 
 def _enviar_email_itv_pendiente():
-    """Detecta y envía email ITV pendiente.
-    Se llama DESPUES de conectar WiFi (antes fallaba DNS -202).
-    Retorna True si se envió, False si no había pendiente o falló.
-    """
+    # Detecta y envía email ITV pendiente. Se llama DESPUES de conectar WiFi. Retorna True si se envió, False si no había pendiente o falló
     try:
         from itv_manager import ITVManager
         gc.collect()
@@ -432,7 +429,7 @@ def _enviar_email_itv_pendiente():
 # =========================================================================
 
 def _detectar_confirmacion_itv_prg():
-    """Detecta 3 pulsaciones cortas de PRG en fase4 para marcar ITV realizada."""
+    # Detecta pulsación de PRG en fase4 para marcar ITV realizada
     try:
         from itv_manager import ITVManager
         gc.collect()
@@ -443,26 +440,11 @@ def _detectar_confirmacion_itv_prg():
     if not itv.hay_email_itv_pendiente():
         return False
 
-    pulsaciones = 0
-    t_inicio = time.ticks_ms()
-
-    while time.ticks_diff(time.ticks_ms(), t_inicio) < 5000:
-        if prg_pulsado():
-            t_pulso = time.ticks_ms()
-            while prg_pulsado():
-                time.sleep_ms(50)
-            dur = time.ticks_diff(time.ticks_ms(), t_pulso)
-            if dur > 1000:
-                pulsaciones = 0
-                continue
-            pulsaciones += 1
-            if pulsaciones >= 3:
-                log_info("ITV_F4", "Confirmacion ITV detectada (3 pulsaciones PRG en fase4)")
-                itv.marcar_itv_realizada(obtener_unix_utc_real(), "boton_prg_fase4")
-                led_blink(5, pausa_ms=100)
-                return True
-        time.sleep_ms(100)
-
+    if placa.detectar_pulsacion_prg():
+        log_info("ITV_F4", "Confirmacion ITV detectada (PRG en fase4)")
+        itv.marcar_itv_realizada(obtener_unix_utc_real(), "boton_prg_fase4")
+        led_blink(5, pausa_ms=100)
+        return True
     return False
 
 

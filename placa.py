@@ -110,24 +110,68 @@ def crear_radio():
 _prg = None
 
 def _prg_pin():
-    """Devuelve el objeto Pin del botón PRG, inicializado una sola vez."""
+    # Devuelve el objeto Pin del botón PRG, inicializado una sola vez
     global _prg
     if _prg is None:
         _prg = machine.Pin(PRG_PIN, machine.Pin.IN, machine.Pin.PULL_UP)
     return _prg
 
 def prg_pulsado():
-    """True si el botón PRG está pulsado ahora mismo (LOW)."""
+    # True si el botón PRG está pulsado ahora mismo (LOW)
     return _prg_pin().value() == 0
 
 def prg_pulsado_al_arrancar(espera_ms=100):
-    """Detecta si PRG está pulsado justo tras el arranque.
-    Incluye una pequeña espera para estabilizar la lectura.
-    Si no se usa, no tiene efecto alguno en el resto del código.
-    """
+    # Detecta si PRG está pulsado justo tras el arranque. Incluye una pequeña espera para estabilizar la lectura
     p = _prg_pin()
     time.sleep_ms(espera_ms)
     return p.value() == 0
+
+def detectar_pulsacion_prg(pulsaciones_objetivo=1, ventana_ms=2000, max_duracion_ms=1000):
+    """Detecta N pulsaciones cortas del botón PRG dentro de una ventana de tiempo.
+
+    Patrón: pulsaciones_objetivo pulsaciones cortas (<= max_duracion_ms cada una)
+    dentro de ventana_ms milisegundos. Una pulsación larga resetea el conteo.
+
+    Args:
+        pulsaciones_objetivo: Número de pulsaciones cortas requeridas.
+        ventana_ms: Ventana de tiempo total en milisegundos.
+        max_duracion_ms: Duración máxima considerada "corta" por pulsación.
+
+    Returns:
+        True si se detectaron las pulsaciones objetivo, False en caso contrario.
+    """
+    if not prg_pulsado():
+        return False
+
+    pulsaciones = 1  # Ya estamos en la primera pulsación
+    t_inicio_ventana = time.ticks_ms()
+
+    # Esperar a que suelten el botón de la primera pulsación
+    while prg_pulsado():
+        time.sleep_ms(50)
+    duracion_primera = time.ticks_diff(time.ticks_ms(), t_inicio_ventana)
+    if duracion_primera > max_duracion_ms:
+        return False
+
+    if pulsaciones >= pulsaciones_objetivo:
+        return True
+
+    while time.ticks_diff(time.ticks_ms(), t_inicio_ventana) < ventana_ms:
+        if prg_pulsado():
+            t_pulso = time.ticks_ms()
+            while prg_pulsado():
+                time.sleep_ms(50)
+            dur = time.ticks_diff(time.ticks_ms(), t_pulso)
+            if dur > max_duracion_ms:
+                # Pulsación larga detectada, resetear conteo
+                pulsaciones = 0
+                continue
+            pulsaciones += 1
+            if pulsaciones >= pulsaciones_objetivo:
+                return True
+        time.sleep_ms(50)
+
+    return False
 
 def modo_limpio(ficheros=None, parpadeos=3):
     """Elimina los ficheros indicados, parpadea el LED y reinicia la placa.
@@ -150,9 +194,7 @@ def modo_limpio(ficheros=None, parpadeos=3):
 
 
 def leer_temperatura_cpu():
-    """Lee la temperatura interna del MCU ESP32-S3.
-    Retorna float (°C) o None si no está disponible.
-    """
+    # Lee la temperatura interna del MCU ESP32-S3. Retorna float (°C) o None si no está disponible
     try:
         import esp32
         return esp32.mcu_temperature()
@@ -161,7 +203,7 @@ def leer_temperatura_cpu():
 
 
 def leer_espacio_filesystem():
-    """Retorna tupla (libre_kb, total_kb) o (None, None)."""
+    # Retorna tupla (libre_kb, total_kb) o (None, None)
     try:
         stat = os.statvfs("/")
         frag_size = stat[1]   # f_frsize
@@ -175,10 +217,7 @@ def leer_espacio_filesystem():
 
 
 class Ventilador:
-    """Control de ventilador por GPIO con histéresis térmica.
-    El estado se mantiene internamente; no usa variables globales.
-    """
-
+    # Control de ventilador por GPIO con histéresis térmica. El estado se mantiene internamente; no usa variables globales
     def __init__(self, gpio, umbral_on_c=55.0, umbral_off_c=45.0):
         self._gpio = gpio
         self._umbral_on = umbral_on_c
@@ -188,7 +227,7 @@ class Ventilador:
         self._inicializado = False
 
     def inicializar(self):
-        """Inicializa el pin GPIO. Retorna True si tuvo éxito."""
+        # Inicializa el pin GPIO. Retorna True si tuvo éxito
         if self._inicializado:
             return True
         try:
@@ -203,9 +242,7 @@ class Ventilador:
             return False
 
     def controlar(self, temp_actual):
-        """Controla el ventilador con histéresis.
-        Retorna True si está encendido, False si apagado.
-        """
+        # Controla el ventilador con histéresis.  Retorna True si está encendido, False si apagado
         if not self._inicializado or self._pin is None or temp_actual is None:
             return self._encendido
 
@@ -219,11 +256,11 @@ class Ventilador:
         return self._encendido
 
     def estado(self):
-        """Retorna True si el ventilador está encendido."""
+        # Retorna True si el ventilador está encendido
         return self._encendido
 
     def encender(self):
-        """Fuerza el encendido del ventilador. Retorna True si tuvo éxito."""
+        # Fuerza el encendido del ventilador. Retorna True si tuvo éxito
         if self._inicializado and self._pin is not None:
             self._pin.value(1)
             self._encendido = True
@@ -231,7 +268,7 @@ class Ventilador:
         return False  # No se pudo encender
 
     def apagar(self):
-        """Fuerza el apagado del ventilador. Retorna True si tuvo éxito."""
+        # Fuerza el apagado del ventilador. Retorna True si tuvo éxito
         if self._inicializado and self._pin is not None:
             self._pin.value(0)
             self._encendido = False
