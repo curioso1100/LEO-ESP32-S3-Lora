@@ -9,7 +9,7 @@ import os
 import gc
 
 from placa import led_on, led_off, led_blink, reiniciar
-from config_system import guardar_fase, obtener_config, version, nombre_proyecto
+from config_system import guardar_fase, obtener_config, version, nombre_proyecto, incrementar_reinicios, leer_f4_fallos, guardar_f4_fallos
 from logger import (
     log_info, log_debug, log_warn, log_error, log_exception,
     leer_estado_pendiente, borrar_estado_pendiente
@@ -359,59 +359,101 @@ def ejecutar():
     led_blink(4)
     led_on()
     log_info("FASE4", "Iniciando despacho de estado")
+    t_inicio_fase4 = time.ticks_ms()
+    MAX_FASE4_MS = 5 * 60 * 1000  # 5 minutos maximo para esta fase
 
-    gc.collect()
-    log_debug("FASE4", "RAM libre al inicio de fase4: {} bytes".format(gc.mem_free()))
+    try:
+        gc.collect()
+        log_debug("FASE4", "RAM libre al inicio de fase4: {} bytes".format(gc.mem_free()))
+            # --- Circuit breaker: evitar bucle infinito de reinicios si email falla siempre ---
+        fallos = leer_f4_fallos()
+        if fallos >= 5:
+            log_warn("FASE4", "Demasiados fallos consecutivos ({}), abandonando email y volviendo a fase3".format(fallos))
+            guardar_f4_fallos(0)
+            guardar_fase(3)
+            apagar_wifi()
+            reiniciar()
+            return
+        elif fallos >= 2:
+            log_warn("FASE4", "Backoff: esperando 3 min antes de reintentar (fallo {}/5)".format(fallos))
+            time.sleep(180)
 
-    # --- ITV: detectar confirmación PRG antes de enviar nada ---
-    if _detectar_confirmacion_itv_prg():
-        log_info("FASE4", "ITV confirmada via PRG. Volviendo a fase3.")
-        guardar_fase(3)
+        # --- ITV: detectar confirmación PRG antes de enviar nada ---
+        if _detectar_confirmacion_itv_prg():
+            log_info("FASE4", "ITV confirmada via PRG. Volviendo a fase3.")
+            guardar_fase(3)
+            apagar_wifi()
+            reiniciar()
+            return
+
+        # --- Leer estado pendiente ANTES de conectar WiFi ---
+        estado_pendiente = leer_estado_pendiente()
+
+        if estado_pendiente is None:
+            log_warn("FASE4", "No hay estado pendiente. Volviendo a fase3.")
+            guardar_fase(3)
+            apagar_wifi()
+            reiniciar()
+            return
+
+        log_info("FASE4", "Detectado estado pendiente de fase3")
+        led_blink(4)
+        led_on()
+
+        # --- Conectar WiFi PRIMERO ---
+        if time.ticks_diff(time.ticks_ms(), t_inicio_fase4) > MAX_FASE4_MS:
+            log_warn("FASE4", "WATCHDOG: excedido tiempo maximo, abortando")
+            apagar_wifi()
+            reiniciar()
+            return
+    
+        wifi_conectado = conectar_wifi()
+        if not wifi_conectado:
+            log_warn("FASE4", "Sin WiFi para enviar estado pendiente")
+            apagar_wifi()
+            time.sleep(30)
+            config_system.incrementar_reinicios()
+            reiniciar()
+            return
+
+        # --- NTP ---
+        ok_ntp, servidor = sincronizar_ntp()
+        if ok_ntp:
+            log_debug("NTP", "Sincronizado con {}".format(servidor))
+
+        # Enviar email ITV DESPUES de tener WiFi ---
+        itv_enviado = _enviar_email_itv_pendiente()
+        if itv_enviado:
+            log_info("FASE4", "Email ITV enviado. Procediendo con email de estado normal...")
+
+
+        if time.ticks_diff(time.ticks_ms(), t_inicio_fase4) > MAX_FASE4_MS:
+            log_warn("FASE4", "WATCHDOG: excedido tiempo maximo antes de email, abortando")
+            apagar_wifi()
+            reiniciar()
+            return
+
+        # --- Email de estado normal ---
+        exito = enviar_email_estado(estado_pendiente)
+
+        if exito:
+            guardar_f4_fallos(0)  # resetear contador de fallos
+            guardar_fase(3)
+        else:
+            log_warn("FASE4", "Email fallo, reintentando mas tarde")
+            incrementar_reinicios()
+            guardar_f4_fallos(fallos + 1)
+
         apagar_wifi()
         reiniciar()
         return
 
-    # --- Leer estado pendiente ANTES de conectar WiFi ---
-    estado_pendiente = leer_estado_pendiente()
-
-    if estado_pendiente is None:
-        log_warn("FASE4", "No hay estado pendiente. Volviendo a fase3.")
-        guardar_fase(3)
+    except Exception as e:
+        log_error("FASE4", "Excepcion no controlada en fase4: {}".format(e))
+    
+    finally:
+        log_warn("FASE4", "Saliendo de fase4 -> reiniciando")
         apagar_wifi()
+        config_system.incrementar_reinicios()
         reiniciar()
-        return
-
-    log_info("FASE4", "Detectado estado pendiente de fase3")
-    led_blink(4)
-    led_on()
-
-    # --- Conectar WiFi PRIMERO ---
-    wifi_conectado = conectar_wifi()
-    if not wifi_conectado:
-        log_warn("FASE4", "Sin WiFi para enviar estado pendiente")
-        apagar_wifi()
-        time.sleep(30)
-        reiniciar()
-        return
-
-    # --- NTP ---
-    ok_ntp, servidor = sincronizar_ntp()
-    if ok_ntp:
-        log_debug("NTP", "Sincronizado con {}".format(servidor))
-
-    # Enviar email ITV DESPUES de tener WiFi ---
-    itv_enviado = _enviar_email_itv_pendiente()
-    if itv_enviado:
-        log_info("FASE4", "Email ITV enviado. Procediendo con email de estado normal...")
-
-    # --- Email de estado normal ---
-    exito = enviar_email_estado(estado_pendiente)
-
-    if exito:
-        guardar_fase(3)
-    else:
-        log_warn("FASE4", "Email fallo, manteniendo fase4 para reintento")
-
-    apagar_wifi()
-    reiniciar()
-    return
+        

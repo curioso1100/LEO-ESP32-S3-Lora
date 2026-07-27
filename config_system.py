@@ -1,14 +1,6 @@
 # =========================================================================
 # MÓDULO: config_system.py
 # =========================================================================
-# FUSIÓN A.2: configuracion.py + estado.py
-# Fecha refactor: 2026-07-23
-# =========================================================================
-#
-# PRINCIPIO: Este módulo NO importa logger.py.
-# Errores de I/O se silencian (valores por defecto), no se propagan.
-# El llamador puede loguear si lo considera necesario.
-# =========================================================================
 
 import json
 import os
@@ -30,7 +22,7 @@ _CONFIG_CACHE = None
 # -------------------------------------------------------------------------
 
 def obtener_config():
-    # Lee config.json. Si falla, devuelve diccionario vacío."""
+    # Lee config.json. Si falla, devuelve diccionario vacío
     global _CONFIG_CACHE
     if _CONFIG_CACHE is not None:
         return _CONFIG_CACHE
@@ -85,11 +77,150 @@ def leer_fase():
 
 
 def borrar_estado():
-    """Elimina estado.json. Si falla, silencia el error."""
+    # Elimina estado.json. Si falla, silencia el error
     try:
         os.remove(_ESTADO_FILE)
     except OSError:
         pass
+
+
+# -------------------------------------------------------------------------
+# GESTIÓN CENTRALIZADA DE BACKUP config.json
+# -------------------------------------------------------------------------
+
+_BACKUP_FILE = "config.json.bak"
+
+
+def _eliminar_backup():
+    # Elimina el fichero de backup si existe. Silencia errores
+    try:
+        if _BACKUP_FILE in os.listdir():
+            os.remove(_BACKUP_FILE)
+    except Exception:
+        pass
+
+
+def actualizar_linea_config(marcador, nueva_linea):
+    """
+    Reemplaza la primera línea que contiene 'marcador' por 'nueva_linea'.
+    Crea backup temporal, lo elimina automáticamente tras éxito.
+    En caso de fallo, restaura desde backup y luego elimina el backup.
+    NO usa logger (respeta principio arquitectónico).
+    Devuelve (exito:bool, msg:str).
+    """
+    # --- Leer original ---
+    try:
+        with open(_CONFIG_FILE, "r") as f:
+            lineas = f.readlines()
+    except Exception as e:
+        return False, "Lectura config.json: {}".format(e)
+
+    # --- Buscar índice ---
+    indice = -1
+    for idx, ln in enumerate(lineas):
+        if marcador in ln:
+            indice = idx
+            break
+    if indice < 0:
+        return False, "Marcador '{}' no encontrado".format(marcador)
+
+    # --- Crear backup (silencioso si falla) ---
+    backup_ok = False
+    try:
+        with open(_BACKUP_FILE, "w") as fb:
+            fb.write("".join(lineas))
+        backup_ok = True
+    except Exception:
+        pass
+
+    # --- Escribir modificado ---
+    lineas[indice] = nueva_linea
+    try:
+        with open(_CONFIG_FILE, "w") as f:
+            f.write("".join(lineas))
+    except Exception as e:
+        # Restaurar si hay backup
+        if backup_ok:
+            try:
+                with open(_BACKUP_FILE, "r") as fb:
+                    restaurado = fb.read()
+                with open(_CONFIG_FILE, "w") as fo:
+                    fo.write(restaurado)
+            except Exception as e2:
+                _eliminar_backup()
+                return False, "Escritura fallo: {}. Restauracion fallo: {}".format(e, e2)
+        _eliminar_backup()
+        return False, "Escritura fallo: {}. Restaurado desde backup.".format(e)
+
+    # --- Éxito: limpiar backup ---
+    _eliminar_backup()
+    return True, "OK"
+
+
+def limpiar_backups_residuales():
+    # Elimina backups huérfanos del filesystem. Llamar una vez al inicio del sistema (ej. en fase3 antes de arrancar)
+    _eliminar_backup()
+
+
+# -------------------------------------------------------------------------
+# CONTADORES PERSISTENTES (estado.json)
+# -------------------------------------------------------------------------
+
+def leer_reinicios():
+    # Lee contador de reinicios desde estado.json. Si falla, devuelve 0
+    try:
+        with open(_ESTADO_FILE, "r") as f:
+            estado = json.load(f)
+        return int(estado.get("reinicios", 0))
+    except (OSError, ValueError):
+        return 0
+
+
+def guardar_reinicios(n):
+    # Guarda contador de reinicios en estado.json. Si falla, silencia
+    try:
+        with open(_ESTADO_FILE, "r") as f:
+            estado = json.load(f)
+        estado["reinicios"] = int(n)
+        with open(_ESTADO_FILE, "w") as f:
+            json.dump(estado, f)
+            f.flush()
+            os.sync()
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def incrementar_reinicios():
+    # Incrementa en 1 el contador de reinicios. Devuelve nuevo valor
+    n = leer_reinicios() + 1
+    guardar_reinicios(n)
+    return n
+
+
+def leer_f4_fallos():
+    # Lee contador de fallos consecutivos de email en fase4
+    try:
+        with open(_ESTADO_FILE, "r") as f:
+            estado = json.load(f)
+        return int(estado.get("f4_fallos_email", 0))
+    except (OSError, ValueError):
+        return 0
+
+
+def guardar_f4_fallos(n):
+    # Guarda contador de fallos consecutivos de email en fase4
+    try:
+        with open(_ESTADO_FILE, "r") as f:
+            estado = json.load(f)
+        estado["f4_fallos_email"] = int(n)
+        with open(_ESTADO_FILE, "w") as f:
+            json.dump(estado, f)
+            f.flush()
+            os.sync()
+        return True
+    except (OSError, ValueError):
+        return False
 
 
 # =========================================================================
@@ -225,7 +356,6 @@ class EstadoEmail:
         elif self._email_cada_seg > 0:
             return "EMAIL:{}s/{}s".format(int(time.time() - self._ultimo_email_ts), self._email_cada_seg)
         return "EMAIL:OFF"
-
 
 
 _MAX_PAY_LEN = 255

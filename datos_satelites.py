@@ -11,7 +11,7 @@ import os
 from logger import log_info, log_debug, log_warn, log_error
 
 from config_system import obtener_config
-from tiempo import obtener_tiempo_actual
+from tiempo_satelites import obtener_tiempo_actual, obtener_desfase_espana
 CONFIG = obtener_config()
 
 FILE_AGENDA = "agenda.json"
@@ -20,27 +20,7 @@ _OFFSET_VERANO_S  = 7200   # UTC+2 (CEST)
 _OFFSET_INVIERNO_S = 3600  # UTC+1 (CET)
 
 
-def obtener_desfase_espana(timestamp_utc):
-    """Devuelve el desfase en segundos (7200 en verano, 3600 en invierno)
-    calculando el ultimo domingo de marzo y octubre segun la norma europea."""
-    tupla_utc = time.localtime(timestamp_utc)
-    ano = tupla_utc[0]
-
-    # Ultimo domingo de marzo  -> inicio horario de verano (01:00 UTC)
-    t_marzo31   = time.mktime((ano, 3, 31, 1, 0, 0, 0, 0, 0)) - 946684800
-    w_marzo     = time.localtime(t_marzo31 + 946684800)
-    ultimo_domingo_marzo  = 31 - ((w_marzo[6] + 1) % 7)
-    limite_verano = time.mktime((ano, 3, ultimo_domingo_marzo, 1, 0, 0, 0, 0, 0))
-
-    # Ultimo domingo de octubre -> fin horario de verano (01:00 UTC)
-    t_octubre31  = time.mktime((ano, 10, 31, 1, 0, 0, 0, 0, 0)) - 946684800
-    w_octubre    = time.localtime(t_octubre31 + 946684800)
-    ultimo_domingo_octubre = 31 - ((w_octubre[6] + 1) % 7)
-    limite_invierno = time.mktime((ano, 10, ultimo_domingo_octubre, 1, 0, 0, 0, 0, 0))
-
-    if limite_verano <= timestamp_utc < limite_invierno:
-        return _OFFSET_VERANO_S
-    return _OFFSET_INVIERNO_S
+# obtener_desfase_espana: importada desde tiempo_satelites.py
 
 
 _DOPPLER_BAJO_HZ  =  3000   # elevacion < 20deg
@@ -122,65 +102,25 @@ def _calcular_horas_estado_automaticas(pases_ordenados, desfase_segundos):
 
 
 def _guardar_config_con_horas_estado(horas_estado):
-    """ Reescribe SOLO la linea email_estado_horas_fijas
-    preservando el formato original del config.json. Usa write() en lugar
-    de writelines() (no disponible en MicroPython)."""
+    """
+    Delega en config_system.actualizar_linea_config() para gestion centralizada
+    del backup (creacion, eliminacion automatica, restauracion en caso de fallo).
+    """
+    from config_system import actualizar_linea_config
 
-    CONFIG_FILE = "config.json"
-    BACKUP_FILE = "config.json.bak"
+    if horas_estado:
+        horas_fmt = ", ".join(['"{}"'.format(h) for h in horas_estado])
+        nueva_linea = '  "email_estado_horas_fijas": [ {} ],\n'.format(horas_fmt)
+    else:
+        nueva_linea = '  "email_estado_horas_fijas": [],\n'
 
-    try:
-        # --- Paso 1: Leer todo el contenido original ---
-        with open(CONFIG_FILE, "r") as f:
-            lineas = f.readlines()
+    exito, msg = actualizar_linea_config('"email_estado_horas_fijas"', nueva_linea)
 
-        # --- Paso 2: Crear backup del original ---
-        try:
-            with open(BACKUP_FILE, "w") as fb:
-                fb.write("".join(lineas))
-        except Exception as e_bak:
-            log_warn("ESTADO_AUTO", "No se pudo crear backup: {}".format(e_bak))
-
-        # --- Paso 3: Construir la nueva linea ---
-        if horas_estado:
-            horas_formateadas = ", ".join(['"{}"'.format(h) for h in horas_estado])
-            nueva_linea = '  "email_estado_horas_fijas": [ {} ],\n'.format(horas_formateadas)
-        else:
-            nueva_linea = '  "email_estado_horas_fijas": [],\n'
-
-        # --- Paso 4: Buscar y reemplazar la linea ---
-        indice_encontrado = -1
-        for idx, linea in enumerate(lineas):
-            if '"email_estado_horas_fijas"' in linea:
-                indice_encontrado = idx
-                break
-
-        if indice_encontrado < 0:
-            log_error("ESTADO_AUTO", "No se encontro la linea email_estado_horas_fijas en config.json")
-            return False
-
-        lineas[indice_encontrado] = nueva_linea
-
-        # --- Paso 5: Escribir todo de golpe con write() ---
-        contenido = "".join(lineas)
-        with open(CONFIG_FILE, "w") as f:
-            f.write(contenido)
-
+    if exito:
         log_info("ESTADO_AUTO", "config.json actualizado. Horas: {}".format(horas_estado))
         return True
-
-    except Exception as e:
-        log_error("ESTADO_AUTO", "Fallo actualizando config.json: {}".format(e))
-        # Intentar restaurar desde backup si existe
-        try:
-            if BACKUP_FILE in os.listdir():
-                with open(BACKUP_FILE, "r") as fb:
-                    backup_contenido = fb.read()
-                with open(CONFIG_FILE, "w") as fo:
-                    fo.write(backup_contenido)
-                log_warn("ESTADO_AUTO", "config.json restaurado desde backup")
-        except Exception as e_restore:
-            log_error("ESTADO_AUTO", "No se pudo restaurar backup: {}".format(e_restore))
+    else:
+        log_error("ESTADO_AUTO", "Fallo actualizando config.json: {}".format(msg))
         return False
 
 
@@ -505,6 +445,7 @@ if __name__ == "__main__":
 
     import network
 
+    # --- Leer config ---
     try:
         with open("config.json", "r") as cf:
             c = json.load(cf)
@@ -516,31 +457,53 @@ if __name__ == "__main__":
         print("[ERROR CRITICO] No se pudo leer config.json:", e_cfg)
         ssid, password, max_intentos = None, None, 0
 
-    if ssid:
-        print(f"[DIAGNOSTICO RED] Conectando a SSID: '{ssid}'...")
-        wlan = network.WLAN(network.STA_IF)
-        try:
-            if wlan.isconnected():
-                wlan.disconnect()
-            wlan.active(False)
-            time.sleep_ms(200)
-        except:
-            pass
+    if not ssid:
+        print("[ERROR] SSID vacio. Abortando.")
+        raise SystemExit
 
+    print("[DIAGNOSTICO RED] Conectando a SSID: '{}'...".format(ssid))
+
+    wlan = network.WLAN(network.STA_IF)
+
+    # --- Reset suave del interfaz WiFi (sin disconnect forzoso) ---
+    if wlan.isconnected():
+        print("[INFO] Ya habia conexion previa. IP: {}".format(wlan.ifconfig()[0]))
+    else:
+        # Solo activar; no forzar disconnect/active(False) que puede bloquear el STA
         wlan.active(True)
+        time.sleep_ms(300)
         wlan.connect(ssid, password)
 
         intentos = 0
+        ultimo_estado = -1
         while not wlan.isconnected() and intentos < max_intentos:
-            print(f" [WiFi] Intentando... ({intentos + 1}/{max_intentos})")
+            estado = wlan.status()
+            if estado != ultimo_estado:
+                ultimo_estado = estado
+                # Codigos de estado MicroPython ESP32
+                estados = {
+                    0: "IDLE", 1: "CONECTANDO", 2: "PASS_ERR",
+                    3: "NO_AP", 4: "FAIL", 5: "CONECTADO"
+                }
+                print(" [WiFi] Intentando... ({}/{})  Estado: {}".format(
+                    intentos + 1, max_intentos, estados.get(estado, "DESCONOCIDO({})".format(estado))))
+            else:
+                print(" [WiFi] Intentando... ({}/{})".format(intentos + 1, max_intentos))
             time.sleep(2)
             intentos += 1
 
         if wlan.isconnected():
-            print(f"[OK] WiFi Conectado! IP: {wlan.ifconfig()[0]}")
-            fecha_hoy = "{:04d}-{:02d}-{:02d}".format(*time.localtime()[:3])
-            descargar_agenda_completa(fecha_hoy)
-            wlan.active(False)
-            print("[INFO] WiFi desconectado para cerrar el diagnostico.")
+            print("[OK] WiFi Conectado! IP: {}".format(wlan.ifconfig()[0]))
         else:
-            print("[ERROR] Imposible conectar al router.")
+            estado_final = wlan.status()
+            print("[ERROR] Imposible conectar al router. Estado final: {}".format(estado_final))
+            wlan.active(False)
+            raise SystemExit
+
+    # --- Descargar agenda ---
+    fecha_hoy = "{:04d}-{:02d}-{:02d}".format(*time.localtime()[:3])
+    descargar_agenda_completa(fecha_hoy)
+
+    # --- Cerrar WiFi ---
+    wlan.active(False)
+    print("[INFO] WiFi desconectado para cerrar el diagnostico.")

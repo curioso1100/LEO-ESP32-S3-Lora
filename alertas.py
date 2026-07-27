@@ -8,7 +8,7 @@ import os
 
 from logger import log_info, log_debug, log_warn, log_error
 from config_system import obtener_config, version, nombre_proyecto
-from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual, formatear_fecha_utc
+from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual, formatear_fecha_utc, obtener_desfase_espana
 
 CONFIG = obtener_config()
 
@@ -17,27 +17,33 @@ def _limpiar_texto_cabecera(texto):
     return str(texto).replace("\r", " ").replace("\n", " ").strip()
 
 
-def _leer_respuesta_smtp(sock, codigo_esperado, debug_activo=False, multilinea=False, max_lecturas=60):
-    for _ in range(max_lecturas):
-        linea_b = sock.readline()
+def _leer_respuesta_smtp(sock, codigo_esperado, debug_activo=False, multilinea=False, timeout_seg=30):
+    t_inicio = time.ticks_ms()
+    timeout_ms = timeout_seg * 1000
+    for _ in range(2000):  # safety break absoluto
+        if time.ticks_diff(time.ticks_ms(), t_inicio) > timeout_ms:
+            raise Exception("Timeout SMTP ({}s)".format(timeout_seg))
+        try:
+            linea_b = sock.readline()
+        except OSError as e:
+            raise Exception("Timeout leyendo respuesta SMTP: {}".format(e))
         if not linea_b:
             time.sleep_ms(50)
             continue
-
         linea = linea_b.decode("utf-8", "ignore").strip()
         if debug_activo:
             log_debug("SMTP", "Servidor: {}".format(linea))
-
         if len(linea) < 3 or not linea[:3].isdigit():
             continue
-
+        # Abortar inmediatamente ante errores permanentes del servidor
+        if linea[0] == '5':
+            raise Exception("Error SMTP permanente: {}".format(linea))
         if multilinea:
             if linea.startswith("{} ".format(codigo_esperado)):
                 return linea
         else:
             if linea.startswith(str(codigo_esperado)):
                 return linea
-
     raise Exception("Timeout o respuesta SMTP inesperada")
 
 
@@ -108,7 +114,6 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
             log_debug("SMTP", "Conectando a {}...".format(sockaddr))
 
         raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        raw_sock.settimeout(timeout_red)
         raw_sock.connect(sockaddr)
         gc.collect()
         time.sleep_ms(200)  # dejar estabilizar TCP antes del handshake SSL
@@ -247,6 +252,12 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
         return False
 
     finally:
+        try:
+            if sock:
+                sock.write(b"QUIT\r\n")
+                time.sleep_ms(100)
+        except Exception:
+            pass
         for s in (sock, raw_sock):
             try:
                 if s:
@@ -257,7 +268,7 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
 
 
 # =========================================================================
-# ITV: Construcción y envío de email de revisión periódica
+# ITV: Construccion y envio de email de revision periodica
 # =========================================================================
 
 _MIN_RAM_ENVIO_ITV = 22000
@@ -353,7 +364,7 @@ def construir_email_itv(email_data):
 
 
 def enviar_email_itv(email_data, debug_activo=False):
-    # Construye y envía email ITV via SMTP. Retorna True/False
+    # Construye y envia email ITV via SMTP. Retorna True/False
     asunto, cuerpo = construir_email_itv(email_data)
 
     if gc.mem_free() < _MIN_RAM_ENVIO_ITV:
@@ -375,114 +386,33 @@ def enviar_email_itv(email_data, debug_activo=False):
 
 
 # =========================================================================
-# HORAS DE ESTADO: Cálculo automático y pendientes
+# HORAS DE ESTADO: Calculo automatico y pendientes
 # =========================================================================
 
-def _calcular_horas_estado_automaticas(pases_ordenados, desfase_segundos):
-    """
-    Recibe lista de pases ordenados por utc_ini_timestamp.
-    Devuelve lista de strings "HH:MM" con las horas de envio de estado.
-
-    Logica:
-    - Inicializa lista vacia.
-    - Recorre pases detectando superposiciones (grupos).
-    - Para cada grupo, toma el utc_fin del ULTIMO pase del grupo.
-    - Comprueba hueco hasta el inicio del siguiente grupo/pase.
-    - Si hueco >= 15 minutos: anade (utc_fin_ultimo + 5 min) formateado.
-    """
-    if not pases_ordenados:
-        return []
-
-    horas_estado = []
-    n = len(pases_ordenados)
-    i = 0
-
-    while i < n:
-        utc_fin_grupo = pases_ordenados[i]["utc_ini_timestamp"] + pases_ordenados[i]["duracion_min"] * 60
-        j = i + 1
-
-        while j < n:
-            utc_ini_sig = pases_ordenados[j]["utc_ini_timestamp"]
-            if utc_ini_sig < utc_fin_grupo:
-                utc_fin_sig = pases_ordenados[j]["utc_ini_timestamp"] + pases_ordenados[j]["duracion_min"] * 60
-                if utc_fin_sig > utc_fin_grupo:
-                    utc_fin_grupo = utc_fin_sig
-                j += 1
-            else:
-                break
-
-        if j < n:
-            utc_ini_siguiente = pases_ordenados[j]["utc_ini_timestamp"]
-            hueco_segundos = utc_ini_siguiente - utc_fin_grupo
-
-            if hueco_segundos >= 15 * 60:  # al menos 15 minutos
-                hora_envio_utc = utc_fin_grupo + 5 * 60  # +5 minutos
-                hora_local = hora_envio_utc + desfase_segundos
-                t_local = time.localtime(hora_local)
-                hora_str = "{:02d}:{:02d}".format(t_local[3], t_local[4])
-                horas_estado.append(hora_str)
-                log_debug("ESTADO_AUTO", "Hueco {} min -> hora estado: {}".format(
-                    hueco_segundos // 60, hora_str))
-            else:
-                log_debug("ESTADO_AUTO", "Hueco {} min (insuficiente, < 15)".format(
-                    hueco_segundos // 60))
-
-        i = j  # Saltar al siguiente grupo
-
-    return horas_estado
+# NOTA: _calcular_horas_estado_automaticas() se importa desde datos_satelites.py
+# para evitar duplicacion de codigo. Ver datos_satelites.py para la implementacion.
 
 
 def _guardar_config_con_horas_estado(horas_estado):
-    #  Reescribe SOLO la linea email_estado_horas_fijas preservando el formato original del config.json. Usa write() en lugar de writelines() (no disponible en MicroPython)
-    CONFIG_FILE = "config.json"
-    BACKUP_FILE = "config.json.bak"
+    """
+    Delega en config_system.actualizar_linea_config() para gestion centralizada
+    del backup (creacion, eliminacion automatica, restauracion en caso de fallo).
+    """
+    from config_system import actualizar_linea_config
 
-    try:
-        with open(CONFIG_FILE, "r") as f:
-            lineas = f.readlines()
+    if horas_estado:
+        horas_fmt = ", ".join(['"{}"'.format(h) for h in horas_estado])
+        nueva_linea = '  "email_estado_horas_fijas": [ {} ],\n'.format(horas_fmt)
+    else:
+        nueva_linea = '  "email_estado_horas_fijas": [],\n'
 
-        try:
-            with open(BACKUP_FILE, "w") as fb:
-                fb.write("".join(lineas))
-        except Exception as e_bak:
-            log_warn("ESTADO_AUTO", "No se pudo crear backup: {}".format(e_bak))
+    exito, msg = actualizar_linea_config('"email_estado_horas_fijas"', nueva_linea)
 
-        if horas_estado:
-            horas_formateadas = ", ".join(['"{}"'.format(h) for h in horas_estado])
-            nueva_linea = '  "email_estado_horas_fijas": [ {} ],\n'.format(horas_formateadas)
-        else:
-            nueva_linea = '  "email_estado_horas_fijas": [],\n'
-
-        indice_encontrado = -1
-        for idx, linea in enumerate(lineas):
-            if '"email_estado_horas_fijas"' in linea:
-                indice_encontrado = idx
-                break
-
-        if indice_encontrado < 0:
-            log_error("ESTADO_AUTO", "No se encontro la linea email_estado_horas_fijas en config.json")
-            return False
-
-        lineas[indice_encontrado] = nueva_linea
-
-        contenido = "".join(lineas)
-        with open(CONFIG_FILE, "w") as f:
-            f.write(contenido)
-
+    if exito:
         log_info("ESTADO_AUTO", "config.json actualizado. Horas: {}".format(horas_estado))
         return True
-
-    except Exception as e:
-        log_error("ESTADO_AUTO", "Fallo actualizando config.json: {}".format(e))
-        try:
-            if BACKUP_FILE in os.listdir():
-                with open(BACKUP_FILE, "r") as fb:
-                    backup_contenido = fb.read()
-                with open(CONFIG_FILE, "w") as fo:
-                    fo.write(backup_contenido)
-                log_warn("ESTADO_AUTO", "config.json restaurado desde backup")
-        except Exception as e_restore:
-            log_error("ESTADO_AUTO", "No se pudo restaurar backup: {}".format(e_restore))
+    else:
+        log_error("ESTADO_AUTO", "Fallo actualizando config.json: {}".format(msg))
         return False
 
 

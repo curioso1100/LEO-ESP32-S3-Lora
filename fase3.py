@@ -10,7 +10,7 @@ import gc
 import os
 
 import placa
-from config_system import guardar_fase, obtener_config
+from config_system import guardar_fase, obtener_config, leer_reinicios, incrementar_reinicios, limpiar_backups_residuales
 from logger import (
     log_info, log_debug, log_warn, log_error, log_exception,
     rotar_logs_txt, escribir_heartbeat
@@ -72,6 +72,7 @@ def _intentar_transicion_fase4(radio, itv=None):
 def ejecutar():
     placa.led_blink(3)
     placa.led_off()
+    limpiar_backups_residuales()
 
     # --- Lazy imports con gc.collect() para evitar fragmentación de heap ---
     gc.collect() 
@@ -114,8 +115,10 @@ def ejecutar():
         log_warn("RTC", "RTC corrupto - transicionando a fase1 para sincronizar")
         guardar_fase(1)
         time.sleep_ms(500)
+        incrementar_reinicios()
         placa.reiniciar()
-    # Radio
+
+# Radio
     params_ini = calcular_parametros_satelite(obtener_unix_utc_real())
     radio = RadioManager()
     radio.inicializar(params_ini)
@@ -171,7 +174,7 @@ def ejecutar():
 
     # --- BUCLE PRINCIPAL ---
     heartbeat_ciclos = 0
-    reinicios = 0
+    reinicios = leer_reinicios()
     ultimo_satelite_en_cielo = None
     thonny_info_mostrada = False
 
@@ -186,8 +189,9 @@ def ejecutar():
                 gc.mem_free(), cfg.min_ram))
             radio.standby()
             reinicios += 1
+            incrementar_reinicios()
             placa.reiniciar()
-
+            
         # Botón PRG (solo marcar ITV)
         _comprobar_prg(radio, itv)
 
@@ -202,6 +206,7 @@ def ejecutar():
             guardar_fase(1)
             radio.standby()
             time.sleep_ms(500)
+            incrementar_reinicios()
             placa.reiniciar()
 
         # Temperatura + ventilador

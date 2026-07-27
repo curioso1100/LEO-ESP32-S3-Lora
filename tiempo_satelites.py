@@ -114,24 +114,31 @@ def formatear_fecha_utc(timestamp):
 # =========================================================================
 
 def obtener_desfase_espana(timestamp_utc):
-    # Devuelve el desfase en segundos (7200 en verano, 3600 en invierno) calculando el ultimo domingo de marzo y octubre segun la norma europea
-    tupla_utc = time.localtime(timestamp_utc)
+    # Devuelve el desfase en segundos (7200 en verano, 3600 en invierno)
+    # calculando el ultimo domingo de marzo y octubre segun la norma europea.
+    # NOTA CRITICA: timestamp_utc viene en epoch Unix (1970), pero time.mktime()
+    # y time.localtime() en MicroPython ESP32 usan epoch 2000. Convertimos
+    # a epoch 2000 antes de operar para que la comparacion sea coherente.
+    timestamp_mp = timestamp_utc - _EPOCH_OFFSET
+
+    tupla_utc = time.localtime(timestamp_mp)
     ano = tupla_utc[0]
 
-    t_marzo31   = time.mktime((ano, 3, 31, 1, 0, 0, 0, 0, 0)) - 946684800
-    w_marzo     = time.localtime(t_marzo31 + 946684800)
-    ultimo_domingo_marzo  = 31 - ((w_marzo[6] + 1) % 7)
-    limite_verano = time.mktime((ano, ultimo_domingo_marzo, 1, 0, 0, 0, 0, 0))
+    # Ultimo domingo de marzo -> inicio horario de verano (01:00 UTC, epoch 2000)
+    t_marzo31 = time.mktime((ano, 3, 31, 1, 0, 0, 0, 0, 0))
+    w_marzo = time.localtime(t_marzo31)
+    ultimo_domingo_marzo = 31 - ((w_marzo[6] + 1) % 7)
+    limite_verano = time.mktime((ano, 3, ultimo_domingo_marzo, 1, 0, 0, 0, 0, 0))
 
-    t_octubre31  = time.mktime((ano, 10, 31, 1, 0, 0, 0, 0, 0)) - 946684800
-    w_octubre    = time.localtime(t_octubre31 + 946684800)
+    # Ultimo domingo de octubre -> fin horario de verano (01:00 UTC, epoch 2000)
+    t_octubre31 = time.mktime((ano, 10, 31, 1, 0, 0, 0, 0, 0))
+    w_octubre = time.localtime(t_octubre31)
     ultimo_domingo_octubre = 31 - ((w_octubre[6] + 1) % 7)
-    limite_invierno = time.mktime((ano, ultimo_domingo_octubre, 1, 0, 0, 0, 0, 0))
+    limite_invierno = time.mktime((ano, 10, ultimo_domingo_octubre, 1, 0, 0, 0, 0, 0))
 
-    if limite_verano <= timestamp_utc < limite_invierno:
+    if limite_verano <= timestamp_mp < limite_invierno:
         return _OFFSET_VERANO_S
     return _OFFSET_INVIERNO_S
-
 
 def _resolver_parametros_lora(info, grupo_data, c):
     def res(clave, defecto):
