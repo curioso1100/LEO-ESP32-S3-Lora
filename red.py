@@ -1,9 +1,10 @@
 # =========================================================================
-# MÓDULO: red.py  -  Funciones comunes WiFi, NTP  (v8.2-fix)
+# MÓDULO: red.py  -  Funciones comunes WiFi, NTP  (v8.2.1-fix)
 # =========================================================================
 import network
 import time
 import json
+import machine
 import gc
 
 from logger import log_info, log_debug, log_warn
@@ -35,6 +36,7 @@ def conectar_wifi():
     Activa la interfaz STA y conecta con las credenciales configuradas.
     Versión robusta: sin disconnect/active(False) forzoso que puede bloquear
     el interfaz STA en MicroPython tras soft reboot.
+    Incluye delay de calentamiento tras POWERON para estabilizar el chip WiFi.
     """
     # Leer config localmente (evita dependencia de import global que puede fallar)
     try:
@@ -50,6 +52,11 @@ def conectar_wifi():
     if not ssid:
         log_warn("WIFI", "SSID vacio. Abortando.")
         return False
+
+    # --- Calentamiento WiFi tras encendido en frío (POWERON) ---
+    if machine.reset_cause() == 1:  # POWERON_RESET
+        log_debug("WIFI", "POWERON detectado. Esperando calentamiento RF...")
+        time.sleep_ms(1500)
 
     wlan = network.WLAN(network.STA_IF)
 
