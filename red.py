@@ -1,22 +1,13 @@
 # =========================================================================
-# MÓDULO: red.py  -  Funciones comunes WiFi, NTP
+# MÓDULO: red.py  -  Funciones comunes WiFi, NTP  (v8.2-fix)
 # =========================================================================
 import network
 import time
+import json
 import gc
 
-from config_system import obtener_config
-from logger import log_debug, log_warn
+from logger import log_info, log_debug, log_warn
 from placa import led_patron_error
-
-CONFIG = obtener_config()
-
-SSID     = CONFIG["wifi_ssid"]
-WIFI_PASS = CONFIG["wifi_pass"]
-
-MAX_INTENTOS_WIFI = int(
-    CONFIG["seguridad_hardware"]["max_intentos_wifi"]
-)
 
 NTP_SERVERS = (
     "pool.ntp.org",
@@ -25,59 +16,72 @@ NTP_SERVERS = (
     "2.pool.ntp.org",
 )
 
+# Códigos de estado WiFi en MicroPython ESP32
+_ESTADOS_WIFI = {
+    0: "IDLE",
+    1: "CONECTANDO",
+    2: "PASS_ERR",
+    3: "NO_AP",
+    4: "FAIL",
+    5: "CONECTADO",
+}
+
 # =========================================================================
 # WIFI
 # =========================================================================
 
 def conectar_wifi():
-    # Activa la interfaz STA y conecta con las credenciales configuradas
-    wlan = None
-
+    """
+    Activa la interfaz STA y conecta con las credenciales configuradas.
+    Versión robusta: sin disconnect/active(False) forzoso que puede bloquear
+    el interfaz STA en MicroPython tras soft reboot.
+    """
+    # Leer config localmente (evita dependencia de import global que puede fallar)
     try:
-        gc.collect()
-        wlan = network.WLAN(network.STA_IF)
+        with open("config.json", "r") as cf:
+            c = json.load(cf)
+            ssid         = c["wifi_ssid"]
+            password     = c["wifi_pass"]
+            max_intentos = int(c.get("seguridad_hardware", {}).get("max_intentos_wifi", 10))
+    except Exception as e_cfg:
+        log_warn("WIFI", "No se pudo leer config.json: {}".format(e_cfg))
+        return False
 
-        try:
-            wlan.disconnect()
-        except Exception:
-            pass
+    if not ssid:
+        log_warn("WIFI", "SSID vacio. Abortando.")
+        return False
 
-        try:
-            wlan.active(False)
-        except Exception:
-            pass
+    wlan = network.WLAN(network.STA_IF)
 
+    # --- Reset suave: solo activar, NUNCA disconnect + active(False) ---
+    if wlan.isconnected():
+        log_info("WIFI", "Ya habia conexion previa. IP: {}".format(wlan.ifconfig()[0]))
+        return True
+
+    wlan.active(True)
+    time.sleep_ms(300)
+    wlan.connect(ssid, password)
+
+    intentos = 0
+    ultimo_estado = -1
+    while not wlan.isconnected() and intentos < max_intentos:
+        estado = wlan.status()
+        if estado != ultimo_estado:
+            ultimo_estado = estado
+            log_debug("WIFI", "Intento {}/{}  Estado: {}".format(
+                intentos + 1, max_intentos,
+                _ESTADOS_WIFI.get(estado, "DESCONOCIDO({})".format(estado))))
         time.sleep(2)
+        intentos += 1
 
-        wlan.active(True)
-        time.sleep_ms(500)
-
-        wlan.connect(SSID, WIFI_PASS)
-
-        intentos = 0
-        while not wlan.isconnected() and intentos < MAX_INTENTOS_WIFI:
-            time.sleep(2)
-            intentos += 1
-
-        if not wlan.isconnected():
-            log_warn("WIFI", "Tiempo de espera agotado tras {} intentos".format(intentos))
-            led_patron_error() # indica el error con el led de la placa
-
-        return wlan.isconnected()
-
-    except Exception as e:
-        log_debug("WIFI", "Error interno WiFi: {}".format(e))
-        log_debug("WIFI", repr(e))
-        log_warn("WIFI",  "Error interno del driver WiFi")
-        led_patron_error() # indica el error con el led de la placa
-
-        try:
-            if wlan:
-                wlan.active(False)
-        except Exception:
-            pass
-
-        gc.collect()
+    if wlan.isconnected():
+        log_info("WIFI", "Conectado! IP: {}".format(wlan.ifconfig()[0]))
+        return True
+    else:
+        estado_final = wlan.status()
+        log_warn("WIFI", "Imposible conectar. Estado final: {}".format(estado_final))
+        wlan.active(False)
+        led_patron_error()
         return False
 
 
@@ -85,20 +89,16 @@ def apagar_wifi():
     # Desconecta y desactiva la interfaz STA
     try:
         wlan = network.WLAN(network.STA_IF)
-
         try:
             wlan.disconnect()
         except Exception:
             pass
-
         try:
             wlan.active(False)
         except Exception:
             pass
-
     except Exception:
         pass
-
     gc.collect()
     log_debug("WIFI", "Interfaz WiFi apagada")
 
@@ -109,7 +109,7 @@ def apagar_wifi():
 
 def sincronizar_ntp():
     # Intenta sincronizar el RTC con los servidores NTP definidos
-    import ntptime  # no está arriba por tema de uso mínimo de memoria
+    import ntptime
     if hasattr(ntptime, "timeout"):
         ntptime.timeout = 3
 
@@ -119,7 +119,6 @@ def sincronizar_ntp():
             log_debug("NTP", "Intentando con {}".format(host))
             ntptime.settime()
             return True, host
-
         except Exception as e:
             log_debug("NTP", "Fallo con {}: {}".format(host, e))
 

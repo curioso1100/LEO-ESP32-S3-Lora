@@ -389,8 +389,9 @@ def enviar_email_itv(email_data, debug_activo=False):
 # HORAS DE ESTADO: Calculo automatico y pendientes
 # =========================================================================
 
-# NOTA: _calcular_horas_estado_automaticas() se importa desde datos_satelites.py
-# para evitar duplicacion de codigo. Ver datos_satelites.py para la implementacion.
+# NOTA: _calcular_horas_estado_automaticas() vive en datos_satelites.py.
+# Este modulo (alertas.py) no la importa directamente. Si necesitas usarla,
+# importala desde datos_satelites para evitar circular imports.
 
 
 def _guardar_config_con_horas_estado(horas_estado):

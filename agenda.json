@@ -1,16 +1,6 @@
 {
-  "fecha_creacion": "2026-07-27",
+  "fecha_creacion": "2026-07-28",
   "pases": [
-    {
-      "satelite": {"nombre": "NORBI-2", "max_elevacion": 36, "delta_doppler_hz": 6000},
-      "tiempo": {"inicio": "22:43", "fin": "22:54", "duracion_min": 11, "utc_ini_timestamp": 1785184980},
-      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
-    },
-    {
-      "satelite": {"nombre": "SM-3.1", "max_elevacion": 17, "delta_doppler_hz": 3000},
-      "tiempo": {"inicio": "23:30", "fin": "23:40", "duracion_min": 10, "utc_ini_timestamp": 1785187855},
-      "lora": {"frecuencia_hz": 435140000, "bw_khz": 62.5, "sf": 8, "cr": 6, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
-    },
     {
       "satelite": {"nombre": "NORBI-2", "max_elevacion": 12, "delta_doppler_hz": 3000},
       "tiempo": {"inicio": "00:18", "fin": "00:27", "duracion_min": 10, "utc_ini_timestamp": 1785190680},
@@ -65,6 +55,16 @@
       "satelite": {"nombre": "SM-3.1", "max_elevacion": 15, "delta_doppler_hz": 3000},
       "tiempo": {"inicio": "14:08", "fin": "14:18", "duracion_min": 10, "utc_ini_timestamp": 1785240500},
       "lora": {"frecuencia_hz": 435140000, "bw_khz": 62.5, "sf": 8, "cr": 6, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "NORBI-2", "max_elevacion": 23, "delta_doppler_hz": 6000},
+      "tiempo": {"inicio": "22:28", "fin": "22:39", "duracion_min": 11, "utc_ini_timestamp": 1785270505},
+      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "TRISAT-4", "max_elevacion": 12, "delta_doppler_hz": 3000},
+      "tiempo": {"inicio": "23:54", "fin": "00:00", "duracion_min": 7, "utc_ini_timestamp": 1785275645},
+      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
     }
   ]
 }

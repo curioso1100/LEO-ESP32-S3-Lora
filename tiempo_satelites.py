@@ -303,7 +303,7 @@ def descargar_agenda_completa(fecha_hoy):
         email_estado_automatico = c.get("email_estado_automatico", False)
         if email_estado_automatico:
             try:
-                from alertas import _calcular_horas_estado_automaticas, _guardar_config_con_horas_estado
+                from datos_satelites import _calcular_horas_estado_automaticas, _guardar_config_con_horas_estado
                 log_info("ESTADO_AUTO", "Modo automatico activado. Calculando horas de estado...")
                 desfase_actual = obtener_desfase_espana(int(time.time()))
                 horas_estado = _calcular_horas_estado_automaticas(pases_consolidados, desfase_actual)

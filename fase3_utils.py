@@ -115,6 +115,21 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                 if identificador.misma_familia(sat_nombre_detectado, sat_activo):
                     sat_nombre_detectado = sat_activo
 
+            # ================================================================
+            # Fallback por frecuencia si no hay match por header
+            # Resuelve identificación de satélites sin identificacion_header
+            # (ej: SM-3.1, KOSAR-1.5) cuando llegan durante su pase agendado.
+            # ================================================================
+            if sat_nombre_detectado is None and sat_objeto is not None:
+                frec_nominal = sat_objeto["satelite"]["lora"]["frecuencia_hz"] / 1000000.0
+                diff_khz = abs(radio.frecuencia - frec_nominal) * 1000
+                if diff_khz <= 100:   # 100 kHz de margen
+                    sat_nombre_detectado = sat_objeto["satelite"]["nombre"]
+                    log_info("ID_FALLBACK",
+                        "Header no reconocido, pero frecuencia coincide con pase activo: "
+                        "{} @ {:.3f}MHz (diff {:.1f}kHz)".format(
+                        sat_nombre_detectado, radio.frecuencia, diff_khz))
+
             if sat_nombre_detectado is not None:
                 sat_nombre = sat_nombre_detectado
                 frec_esperada = identificador.frecuencia_nominal(sat_nombre)
