@@ -11,8 +11,8 @@
   "doppler": false,
   "email_estado_cada_minutos": 0,
   "email_estado_automatico": true,
-  "email_estado_vacio": false,
-  "email_estado_horas_fijas": [ "22:59", "23:45", "01:20", "12:06", "12:50", "13:51" ],
+  "email_estado_vacio": true,
+  "email_estado_horas_fijas": [ "00:08", "15:30", "21:00" ],
   "heartbeat": true,
   "heartbeat_intervalo_base_min": 15,
   "heartbeat_intervalo_pase_min": 2,
@@ -178,8 +178,8 @@
             "familia_header": "trisat"
           }
         },
-        "NORBI-2": {
-          "id": "57179",
+        "NORBI": {
+          "id": "46494",
           "frec": 436700000,
           "ancho_banda_hz": "250000",
           "lora_sf": 10,
@@ -201,6 +201,45 @@
             "longitud_minima": 1,
             "longitud_exacta": 143
           }
+        },
+        "NORBI-2": {
+          "id": "57179",
+          "frec": 435600000,
+          "ancho_banda_hz": "250000",
+          "lora_sf": 10,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false
+        },
+        "HUNITY": {
+          "id": "66270",
+          "frec": 437400000,
+          "ancho_banda_hz": "125000",
+          "lora_sf": 9,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false
+        },
+        "MORSAT-1": {
+          "id": "67274",
+          "frec": 435000000,
+          "ancho_banda_hz": "125000",
+          "lora_sf": 7,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 10,
+          "crc_on": false,
+          "buscar_parametros": false
         },
         "KOSAR-1.5": {
           "id": "67264",

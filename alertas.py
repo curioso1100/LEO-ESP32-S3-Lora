@@ -1,6 +1,7 @@
 # =========================================================================
 # MODULO: alertas.py
 # =========================================================================
+
 import gc
 import json
 import time
@@ -20,7 +21,7 @@ def _limpiar_texto_cabecera(texto):
 def _leer_respuesta_smtp(sock, codigo_esperado, debug_activo=False, multilinea=False, timeout_seg=30):
     t_inicio = time.ticks_ms()
     timeout_ms = timeout_seg * 1000
-    for _ in range(2000):  # safety break absoluto
+    for _ in range(2000):
         if time.ticks_diff(time.ticks_ms(), t_inicio) > timeout_ms:
             raise Exception("Timeout SMTP ({}s)".format(timeout_seg))
         try:
@@ -35,7 +36,6 @@ def _leer_respuesta_smtp(sock, codigo_esperado, debug_activo=False, multilinea=F
             log_debug("SMTP", "Servidor: {}".format(linea))
         if len(linea) < 3 or not linea[:3].isdigit():
             continue
-        # Abortar inmediatamente ante errores permanentes del servidor
         if linea[0] == '5':
             raise Exception("Error SMTP permanente: {}".format(linea))
         if multilinea:
@@ -63,13 +63,29 @@ def _cargar_agenda_segura():
         return "Desconocida", []
 
 
+def _sock_write_all(sock, data):
+    total = len(data)
+    enviados = 0
+    while enviados < total:
+        try:
+            n = sock.write(data[enviados:])
+            if n is None or n == 0:
+                time.sleep_ms(20)
+                continue
+            enviados += n
+        except OSError as e:
+            if e.args[0] in (11, 35):
+                time.sleep_ms(20)
+                continue
+            raise
+
+
 def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug_activo=False):
     import socket
     import ssl
     from tiempo_satelites import obtener_desfase_espana
 
     log_info("SMTP", "Gestionando el envio de email")
-
     if debug_activo:
         log_debug("SMTP", "Entrando en la funcion enviar_correo_bloques")
     gc.collect()
@@ -86,13 +102,11 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
 
     try:
         _, hora_arranque, _ = obtener_tiempo_actual()
-        gc.collect()  # liberar memoria usada por calculo de tiempo
+        gc.collect()
         desfase_segundos = obtener_desfase_espana(obtener_unix_utc_real())
         gc.collect()
-
         if debug_activo:
             log_debug("SMTP", "Hora local calculada: {}".format(hora_arranque))
-
     except Exception as e_time:
         log_error("SMTP", "Fallo procesando hora local: {}".format(e_time))
         return False
@@ -101,22 +115,22 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
     raw_sock = None
 
     try:
-        gc.collect()  # --- antes de DNS ---
+        gc.collect()
         if debug_activo:
             log_debug("SMTP", "Resolviendo DNS de smtp.gmail.com...")
-
         res_dns = socket.getaddrinfo("smtp.gmail.com", 465)
         sockaddr = res_dns[-1][-1]
-        del res_dns       # liberar lista de resultados DNS
+        del res_dns
         gc.collect()
 
         if debug_activo:
             log_debug("SMTP", "Conectando a {}...".format(sockaddr))
 
         raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        raw_sock.settimeout(timeout_red)
         raw_sock.connect(sockaddr)
         gc.collect()
-        time.sleep_ms(200)  # dejar estabilizar TCP antes del handshake SSL
+        time.sleep_ms(200)
 
         if debug_activo:
             log_debug("SMTP", "Envolviendo socket en capa SSL...")
@@ -132,6 +146,10 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
             time.sleep_ms(250)
             gc.collect()
             sock = ssl.wrap_socket(raw_sock)
+        try:
+            sock.settimeout(timeout_red)
+        except Exception:
+            pass
 
         if debug_activo:
             log_debug("SMTP", "Esperando saludo 220...")
@@ -145,7 +163,7 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
         if debug_activo:
             log_debug("SMTP", "Preparando credenciales...")
 
-        import ubinascii  # lazy: solo se usa aqui
+        import ubinascii
         user_b64 = ubinascii.b2a_base64(remitente.encode()).decode().strip()
         pass_b64 = ubinascii.b2a_base64(clave.encode()).decode().strip()
 
@@ -158,7 +176,7 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
         sock.write((pass_b64 + "\r\n").encode())
         _leer_respuesta_smtp(sock, 235, debug_activo=debug_activo)
 
-        del user_b64, pass_b64  # liberar credenciales codificadas
+        del user_b64, pass_b64
         gc.collect()
 
         if debug_activo:
@@ -186,13 +204,30 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
             encabezado = "Datos de captura {} {}\r\n".format(nombre_proyecto(), version())
             sock.write(encabezado.encode())
             sock.write(b"=========================\r\n")
+            linea_envio = "Enviado: {} CEST\r\n".format(hora_arranque)
+            sock.write(linea_envio.encode())
+            sock.write(b"=========================\r\n")
+
             cuerpo_limpio = str(texto_telemetria).replace("->", " pasa a ").replace("|", " ")
             cuerpo_limpio = cuerpo_limpio.replace("\r", " ").replace("\n", "\r\n")
-            sock.write((cuerpo_limpio + "\r\n").encode())
-            del cuerpo_limpio  # liberar si el cuerpo es grande
+
+            lineas = cuerpo_limpio.split("\r\n")
+            for idx in range(len(lineas)):
+                if lineas[idx].startswith("."):
+                    lineas[idx] = ".." + lineas[idx]
+            cuerpo_limpio = "\r\n".join(lineas)
+
+            cuerpo_bytes = (cuerpo_limpio + "\r\n").encode()
+            del cuerpo_limpio
             gc.collect()
+            _sock_write_all(sock, cuerpo_bytes)
+            del cuerpo_bytes
+            gc.collect()
+
+            time.sleep_ms(300)
+
         else:
-            gc.collect()  # --- antes de cargar agenda (puede ser grande) ---
+            gc.collect()
             encabezado = "Reporte diario de pases {} {}\r\n".format(nombre_proyecto(), version())
             sock.write(encabezado.encode())
             sock.write(b"===========================\r\n")
@@ -231,7 +266,7 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
             except Exception as e_horas:
                 log_warn("SMTP", "No se pudo incluir horas de estado: {}".format(e_horas))
 
-            del fecha_agenda, pases  # liberar agenda de memoria
+            del fecha_agenda, pases
             gc.collect()
 
         if debug_activo:
@@ -267,15 +302,10 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
         gc.collect()
 
 
-# =========================================================================
-# ITV: Construccion y envio de email de revision periodica
-# =========================================================================
-
 _MIN_RAM_ENVIO_ITV = 22000
 
 
 def construir_email_itv(email_data):
-    # Construye asunto y cuerpo del email ITV a partir de datos preparados por ITVManager
     motivos = email_data.get("motivos", [])
     metricas = email_data.get("metricas", {})
     checklist = email_data.get("checklist", [])
@@ -364,7 +394,6 @@ def construir_email_itv(email_data):
 
 
 def enviar_email_itv(email_data, debug_activo=False):
-    # Construye y envia email ITV via SMTP. Retorna True/False
     asunto, cuerpo = construir_email_itv(email_data)
 
     if gc.mem_free() < _MIN_RAM_ENVIO_ITV:
@@ -385,20 +414,7 @@ def enviar_email_itv(email_data, debug_activo=False):
     return exito
 
 
-# =========================================================================
-# HORAS DE ESTADO: Calculo automatico y pendientes
-# =========================================================================
-
-# NOTA: _calcular_horas_estado_automaticas() vive en datos_satelites.py.
-# Este modulo (alertas.py) no la importa directamente. Si necesitas usarla,
-# importala desde datos_satelites para evitar circular imports.
-
-
 def _guardar_config_con_horas_estado(horas_estado):
-    """
-    Delega en config_system.actualizar_linea_config() para gestion centralizada
-    del backup (creacion, eliminacion automatica, restauracion en caso de fallo).
-    """
     from config_system import actualizar_linea_config
 
     if horas_estado:
@@ -418,13 +434,12 @@ def _guardar_config_con_horas_estado(horas_estado):
 
 
 def obtener_horas_pendientes_estado():
-    #  Devuelve lista de horas fijas de estado pendientes de envio. Gestiona correctamente el cruce de medianoche en la lista de horas
     horas_fijas = CONFIG.get("email_estado_horas_fijas", [])
     if not horas_fijas:
         return []
 
     utc_unix, _, t_local = obtener_tiempo_actual()
-    hora_actual_min = t_local[3] * 60 + t_local[4]  # minutos desde 00:00
+    hora_actual_min = t_local[3] * 60 + t_local[4]
 
     horas_min = []
     for h_str in horas_fijas:

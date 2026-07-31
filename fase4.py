@@ -2,7 +2,6 @@
 # fase4.py - ENVIO DE EMAIL DE ESTADO PENDIENTE + ITV
 #######################################################
 
-
 import machine
 import time
 import os
@@ -21,16 +20,18 @@ from alertas import obtener_horas_pendientes_estado
 CONFIG = obtener_config()
 DEBUG_MODO = CONFIG.get("debug_consola", True)
 
-# RAM minima para envio seguro (SSL ~35KB + email ~15KB + margen)
+# RAM minima para envio seguro
 _MIN_RAM_ENVIO = 22000
-
 # Tamano maximo de payload por email de capturas (chars)
 _MAX_PAYLOAD_CAPTURAS_CHARS = 8500
+# Heartbeats maximo por email (limite buffer SSL ESP32 ~2KB)
+_MAX_HB_EMAIL = 20
 
 
 def _ram_libre():
     gc.collect()
     return gc.mem_free()
+
 def _borrar_logs_originales():
     for f in ("heartbeat.log", "errores.log", "errores.log.old"):
         try:
@@ -40,17 +41,13 @@ def _borrar_logs_originales():
 
 
 def _fragmentar_capturas(capturas):
-    # Divide la lista de capturas en trozos que quepan en ~9KB de payload
     if not capturas:
         return []
-
     trozos = []
     trozo_actual = []
     tam_actual = 0
-
     for linea in capturas:
         tam_linea = len(linea) + 1
-
         if tam_actual + tam_linea > _MAX_PAYLOAD_CAPTURAS_CHARS and trozo_actual:
             trozos.append(trozo_actual)
             trozo_actual = [linea]
@@ -58,10 +55,8 @@ def _fragmentar_capturas(capturas):
         else:
             trozo_actual.append(linea)
             tam_actual += tam_linea
-
     if trozo_actual:
         trozos.append(trozo_actual)
-
     return trozos
 
 
@@ -69,24 +64,18 @@ def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
                              temp_cpu, ventilador_on, fs_libre_kb, errores,
                              paquetes_capturados=0, paquetes_descartados=0,
                              horas_pendientes=None):
-    # Construye el cuerpo del Email 1: Estado + Heartbeats
     partes = []
     partes.append("ESTADO DEL SISTEMA")
     partes.append("Heartbeats acumulados: {}".format(num_hb))
-
     if temp_cpu is not None:
         partes.append("Temperatura CPU: {:.1f}C".format(temp_cpu))
     partes.append("Ventilador: {}".format("ENCENDIDO" if ventilador_on else "APAGADO"))
     if fs_libre_kb is not None:
         partes.append("Espacio filesystem: {:.0f}KB libres".format(fs_libre_kb))
-
-    # Contadores de recepcion para diagnostico
     partes.append("Paquetes capturados: {} | Descartados: {}".format(
         paquetes_capturados, paquetes_descartados))
-
     if num_hb > 0:
         partes.append("BASE: {} | PASE: {}".format(base_count, pase_count))
-        # Horas pendientes de envio de estado
         if horas_pendientes:
             partes.append("Horas pendientes de envio de email de estado: {}".format(
                 ", ".join(horas_pendientes)))
@@ -95,11 +84,9 @@ def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
         partes.extend(heartbeats)
     else:
         partes.append("(Sin heartbeats acumulados)")
-        # Horas pendientes incluso sin heartbeats
         if horas_pendientes:
             partes.append("Horas pendientes de envio de email de estado: {}".format(
                 ", ".join(horas_pendientes)))
-
     if errores:
         partes.append("")
         partes.append("=== ERRORES.LOG ===")
@@ -107,13 +94,11 @@ def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
     else:
         partes.append("")
         partes.append("(Sin errores/alertas relevantes en el periodo)")
-
     return "\n".join(partes)
 
 
 def _construir_email_capturas(trozo_capturas, num_trozo, total_trozos,
                                num_cap_total, linea_inicio, linea_fin):
-    # Construye el cuerpo de un email de capturas fragmentado
     partes = []
     partes.append("=== CAPTURAS ACUMULADAS ({}) ===".format(num_cap_total))
     partes.append("Fragmento {} de {} -- lineas {} a {}".format(
@@ -124,7 +109,6 @@ def _construir_email_capturas(trozo_capturas, num_trozo, total_trozos,
 
 
 def _enviar_email_smtp(asunto, cuerpo, debug_activo):
-    # Envia un email via SMTP. Retorna True/False
     import alertas
     return alertas.enviar_correo_bloques(
         asunto,
@@ -138,12 +122,15 @@ def enviar_email_estado(estado_pendiente):
     log_info("FASE4", "Enviando email de estado pendiente...")
 
     heartbeats = estado_pendiente.get("heartbeats", [])
+    # Limitar heartbeats para no saturar el buffer SSL del ESP32 (~2KB)
+    if len(heartbeats) > _MAX_HB_EMAIL:
+        heartbeats = heartbeats[-_MAX_HB_EMAIL:]
+
     capturas = estado_pendiente.get("capturas", [])
     temp_cpu = estado_pendiente.get("temp_cpu", None)
     ventilador_on = estado_pendiente.get("ventilador_on", False)
     fs_libre_kb = estado_pendiente.get("fs_libre_kb", None)
     errores = estado_pendiente.get('errores', '')
-    # Extraer contadores ANTES de liberar estado_pendiente
     paquetes_capturados = estado_pendiente.get("paquetes_capturados", 0)
     paquetes_descartados = estado_pendiente.get("paquetes_descartados", 0)
 
@@ -152,7 +139,6 @@ def enviar_email_estado(estado_pendiente):
     base_count = sum(1 for hb in heartbeats if "BASE" in hb)
     pase_count = sum(1 for hb in heartbeats if "PASE" in hb)
 
-    # Modo no-vacio — omitir envio si no hay capturas
     email_estado_vacio = CONFIG.get("email_estado_vacio", True)
     if not email_estado_vacio and num_cap == 0:
         log_info("FASE4", "Modo no-vacio activo: 0 capturas, omitiendo envio de estado")
@@ -164,15 +150,11 @@ def enviar_email_estado(estado_pendiente):
 
     horas_pendientes = obtener_horas_pendientes_estado()
 
-    # Liberar estado_pendiente de memoria lo antes posible
     del estado_pendiente
     gc.collect()
 
     log_debug("FASE4", "RAM libre tras extraer datos: {} bytes".format(_ram_libre()))
 
-    # ============================================================
-    # EMAIL 1: ESTADO + HEARTBEATS (prioritario)
-    # ============================================================
     log_info("FASE4", "Preparando Email 1: Estado + Heartbeats...")
 
     cuerpo_estado = _construir_email_estado(
@@ -191,7 +173,6 @@ def enviar_email_estado(estado_pendiente):
     if gc.mem_free() < _MIN_RAM_ENVIO:
         log_warn("FASE4", "RAM insuficiente para Email 1 ({} < {} bytes)".format(
             gc.mem_free(), _MIN_RAM_ENVIO))
-        log_warn("FASE4", "Todo cancelado. Se reintentara en proximo ciclo.")
         del cuerpo_estado
         gc.collect()
         return False
@@ -209,9 +190,6 @@ def enviar_email_estado(estado_pendiente):
 
     log_info("FASE4", "Email 1 (Estado+Heartbeats) enviado correctamente")
 
-    # ============================================================
-    # EMAILS N: CAPTURAS FRAGMENTADAS
-    # ============================================================
     if num_cap <= 0:
         log_info("FASE4", "Sin capturas para enviar.")
         borrar_estado_pendiente()
@@ -221,7 +199,6 @@ def enviar_email_estado(estado_pendiente):
     log_info("FASE4", "Fragmentando {} capturas en emails de ~9KB...".format(num_cap))
     gc.collect()
 
-    # Fragmentar capturas en trozos manejables
     trozos = _fragmentar_capturas(capturas)
     total_trozos = len(trozos)
     del capturas
@@ -254,8 +231,6 @@ def enviar_email_estado(estado_pendiente):
         if gc.mem_free() < _MIN_RAM_ENVIO:
             log_warn("FASE4", "RAM insuficiente para fragmento {} ({} < {} bytes)".format(
                 num_trozo, gc.mem_free(), _MIN_RAM_ENVIO))
-            log_warn("FASE4", "Abortando envio de capturas. {} fragmento(s) perdido(s).".format(
-                total_trozos - num_trozo + 1))
             del cuerpo_frag
             gc.collect()
             todos_enviados = False
@@ -297,12 +272,7 @@ def enviar_email_estado(estado_pendiente):
         return False
 
 
-# =========================================================================
-# ITV: Envio de email ITV pendiente
-# =========================================================================
-
 def _enviar_email_itv_pendiente():
-    # Detecta y envía email ITV pendiente via alertas.py. Retorna True si se envió, False si no había pendiente o falló
     try:
         from itv_manager import ITVManager
         gc.collect()
@@ -331,12 +301,7 @@ def _enviar_email_itv_pendiente():
     return exito
 
 
-# =========================================================================
-# ITV: Detectar confirmación ITV desde botón PRG en fase4
-# =========================================================================
-
 def _detectar_confirmacion_itv_prg():
-    # Detecta pulsación de PRG en fase4 para marcar ITV realizada
     try:
         from itv_manager import ITVManager
         gc.collect()
@@ -360,13 +325,14 @@ def ejecutar():
     led_on()
     log_info("FASE4", "Iniciando despacho de estado")
     t_inicio_fase4 = time.ticks_ms()
-    MAX_FASE4_MS = 5 * 60 * 1000  # 5 minutos maximo para esta fase
+    MAX_FASE4_MS = 5 * 60 * 1000
+
+    fallos = leer_f4_fallos()
 
     try:
         gc.collect()
         log_debug("FASE4", "RAM libre al inicio de fase4: {} bytes".format(gc.mem_free()))
-            # --- Circuit breaker: evitar bucle infinito de reinicios si email falla siempre ---
-        fallos = leer_f4_fallos()
+
         if fallos >= 5:
             log_warn("FASE4", "Demasiados fallos consecutivos ({}), abandonando email y volviendo a fase3".format(fallos))
             guardar_f4_fallos(0)
@@ -378,7 +344,6 @@ def ejecutar():
             log_warn("FASE4", "Backoff: esperando 3 min antes de reintentar (fallo {}/5)".format(fallos))
             time.sleep(180)
 
-        # --- ITV: detectar confirmación PRG antes de enviar nada ---
         if _detectar_confirmacion_itv_prg():
             log_info("FASE4", "ITV confirmada via PRG. Volviendo a fase3.")
             guardar_fase(3)
@@ -386,7 +351,6 @@ def ejecutar():
             reiniciar()
             return
 
-        # --- Leer estado pendiente ANTES de conectar WiFi ---
         estado_pendiente = leer_estado_pendiente()
 
         if estado_pendiente is None:
@@ -400,32 +364,28 @@ def ejecutar():
         led_blink(4)
         led_on()
 
-        # --- Conectar WiFi PRIMERO ---
         if time.ticks_diff(time.ticks_ms(), t_inicio_fase4) > MAX_FASE4_MS:
             log_warn("FASE4", "WATCHDOG: excedido tiempo maximo, abortando")
             apagar_wifi()
             reiniciar()
             return
-    
+
         wifi_conectado = conectar_wifi()
         if not wifi_conectado:
             log_warn("FASE4", "Sin WiFi para enviar estado pendiente")
             apagar_wifi()
             time.sleep(30)
-            config_system.incrementar_reinicios()
+            incrementar_reinicios()
             reiniciar()
             return
 
-        # --- NTP ---
         ok_ntp, servidor = sincronizar_ntp()
         if ok_ntp:
             log_debug("NTP", "Sincronizado con {}".format(servidor))
 
-        # Enviar email ITV DESPUES de tener WiFi ---
         itv_enviado = _enviar_email_itv_pendiente()
         if itv_enviado:
             log_info("FASE4", "Email ITV enviado. Procediendo con email de estado normal...")
-
 
         if time.ticks_diff(time.ticks_ms(), t_inicio_fase4) > MAX_FASE4_MS:
             log_warn("FASE4", "WATCHDOG: excedido tiempo maximo antes de email, abortando")
@@ -433,11 +393,10 @@ def ejecutar():
             reiniciar()
             return
 
-        # --- Email de estado normal ---
         exito = enviar_email_estado(estado_pendiente)
 
         if exito:
-            guardar_f4_fallos(0)  # resetear contador de fallos
+            guardar_f4_fallos(0)
             guardar_fase(3)
         else:
             log_warn("FASE4", "Email fallo, reintentando mas tarde")
@@ -450,10 +409,13 @@ def ejecutar():
 
     except Exception as e:
         log_error("FASE4", "Excepcion no controlada en fase4: {}".format(e))
-    
+        try:
+            guardar_f4_fallos(fallos + 1)
+        except Exception:
+            pass
+
     finally:
         log_warn("FASE4", "Saliendo de fase4 -> reiniciando")
         apagar_wifi()
-        config_system.incrementar_reinicios()
+        incrementar_reinicios()
         reiniciar()
-        

@@ -1,70 +1,80 @@
 {
-  "fecha_creacion": "2026-07-28",
+  "fecha_creacion": "2026-07-31",
   "pases": [
     {
-      "satelite": {"nombre": "NORBI-2", "max_elevacion": 12, "delta_doppler_hz": 3000},
-      "tiempo": {"inicio": "00:18", "fin": "00:27", "duracion_min": 10, "utc_ini_timestamp": 1785190680},
+      "satelite": {"nombre": "TRISAT-3", "max_elevacion": 12, "delta_doppler_hz": 3000},
+      "tiempo": {"inicio": "00:01", "fin": "00:05", "duracion_min": 5, "utc_ini_timestamp": 1785448860},
       "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
     },
     {
-      "satelite": {"nombre": "KOSAR-1.5", "max_elevacion": 82, "delta_doppler_hz": 9000},
-      "tiempo": {"inicio": "00:22", "fin": "00:33", "duracion_min": 12, "utc_ini_timestamp": 1785190935},
+      "satelite": {"nombre": "SM-3.1", "max_elevacion": 42, "delta_doppler_hz": 6000},
+      "tiempo": {"inicio": "00:01", "fin": "00:12", "duracion_min": 12, "utc_ini_timestamp": 1785448895},
+      "lora": {"frecuencia_hz": 435140000, "bw_khz": 62.5, "sf": 8, "cr": 6, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "TRISAT-4", "max_elevacion": 84, "delta_doppler_hz": 9000},
+      "tiempo": {"inicio": "00:48", "fin": "00:57", "duracion_min": 10, "utc_ini_timestamp": 1785451705},
+      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "KOSAR-1.5", "max_elevacion": 34, "delta_doppler_hz": 6000},
+      "tiempo": {"inicio": "00:54", "fin": "01:06", "duracion_min": 12, "utc_ini_timestamp": 1785452095},
       "lora": {"frecuencia_hz": 436100000, "bw_khz": 125.0, "sf": 8, "cr": 5, "sync_word": 52, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
     },
     {
-      "satelite": {"nombre": "TRISAT-3", "max_elevacion": 83, "delta_doppler_hz": 9000},
-      "tiempo": {"inicio": "00:45", "fin": "00:54", "duracion_min": 10, "utc_ini_timestamp": 1785192325},
+      "satelite": {"nombre": "TRISAT-3", "max_elevacion": 17, "delta_doppler_hz": 3000},
+      "tiempo": {"inicio": "01:27", "fin": "01:36", "duracion_min": 9, "utc_ini_timestamp": 1785454070},
       "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
     },
     {
-      "satelite": {"nombre": "TRISAT-4", "max_elevacion": 60, "delta_doppler_hz": 6000},
-      "tiempo": {"inicio": "00:55", "fin": "01:04", "duracion_min": 10, "utc_ini_timestamp": 1785192905},
-      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
-    },
-    {
-      "satelite": {"nombre": "SM-3.1", "max_elevacion": 25, "delta_doppler_hz": 6000},
-      "tiempo": {"inicio": "01:04", "fin": "01:14", "duracion_min": 11, "utc_ini_timestamp": 1785193440},
+      "satelite": {"nombre": "SM-3.1", "max_elevacion": 10, "delta_doppler_hz": 3000},
+      "tiempo": {"inicio": "01:36", "fin": "01:45", "duracion_min": 9, "utc_ini_timestamp": 1785454595},
       "lora": {"frecuencia_hz": 435140000, "bw_khz": 62.5, "sf": 8, "cr": 6, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "NORBI-2", "max_elevacion": 18, "delta_doppler_hz": 3000},
+      "tiempo": {"inicio": "11:05", "fin": "11:16", "duracion_min": 11, "utc_ini_timestamp": 1785488745},
+      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "KOSAR-1.5", "max_elevacion": 21, "delta_doppler_hz": 6000},
+      "tiempo": {"inicio": "12:25", "fin": "12:36", "duracion_min": 11, "utc_ini_timestamp": 1785493545},
+      "lora": {"frecuencia_hz": 436100000, "bw_khz": 125.0, "sf": 8, "cr": 5, "sync_word": 52, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "NORBI-2", "max_elevacion": 24, "delta_doppler_hz": 6000},
+      "tiempo": {"inicio": "12:39", "fin": "12:50", "duracion_min": 11, "utc_ini_timestamp": 1785494375},
+      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "SM-3.1", "max_elevacion": 78, "delta_doppler_hz": 9000},
+      "tiempo": {"inicio": "13:05", "fin": "13:16", "duracion_min": 12, "utc_ini_timestamp": 1785495935},
+      "lora": {"frecuencia_hz": 435140000, "bw_khz": 62.5, "sf": 8, "cr": 6, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "TRISAT-4", "max_elevacion": 75, "delta_doppler_hz": 9000},
+      "tiempo": {"inicio": "13:28", "fin": "13:37", "duracion_min": 10, "utc_ini_timestamp": 1785497315},
+      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "KOSAR-1.5", "max_elevacion": 20, "delta_doppler_hz": 6000},
+      "tiempo": {"inicio": "13:59", "fin": "14:09", "duracion_min": 11, "utc_ini_timestamp": 1785499165},
+      "lora": {"frecuencia_hz": 436100000, "bw_khz": 125.0, "sf": 8, "cr": 5, "sync_word": 52, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
+    },
+    {
+      "satelite": {"nombre": "TRISAT-3", "max_elevacion": 23, "delta_doppler_hz": 6000},
+      "tiempo": {"inicio": "14:03", "fin": "14:12", "duracion_min": 9, "utc_ini_timestamp": 1785499430},
+      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
     },
     {
       "satelite": {"nombre": "NORBI-2", "max_elevacion": 73, "delta_doppler_hz": 9000},
-      "tiempo": {"inicio": "11:49", "fin": "12:01", "duracion_min": 12, "utc_ini_timestamp": 1785232195},
+      "tiempo": {"inicio": "23:17", "fin": "23:28", "duracion_min": 12, "utc_ini_timestamp": 1785532630},
       "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
     },
     {
-      "satelite": {"nombre": "SM-3.1", "max_elevacion": 27, "delta_doppler_hz": 6000},
-      "tiempo": {"inicio": "12:34", "fin": "12:45", "duracion_min": 11, "utc_ini_timestamp": 1785234860},
+      "satelite": {"nombre": "SM-3.1", "max_elevacion": 23, "delta_doppler_hz": 6000},
+      "tiempo": {"inicio": "23:41", "fin": "23:51", "duracion_min": 11, "utc_ini_timestamp": 1785534080},
       "lora": {"frecuencia_hz": 435140000, "bw_khz": 62.5, "sf": 8, "cr": 6, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
-    },
-    {
-      "satelite": {"nombre": "TRISAT-3", "max_elevacion": 68, "delta_doppler_hz": 9000},
-      "tiempo": {"inicio": "13:26", "fin": "13:35", "duracion_min": 10, "utc_ini_timestamp": 1785237980},
-      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
-    },
-    {
-      "satelite": {"nombre": "KOSAR-1.5", "max_elevacion": 52, "delta_doppler_hz": 6000},
-      "tiempo": {"inicio": "13:26", "fin": "13:37", "duracion_min": 12, "utc_ini_timestamp": 1785238000},
-      "lora": {"frecuencia_hz": 436100000, "bw_khz": 125.0, "sf": 8, "cr": 5, "sync_word": 52, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
-    },
-    {
-      "satelite": {"nombre": "TRISAT-4", "max_elevacion": 71, "delta_doppler_hz": 9000},
-      "tiempo": {"inicio": "13:36", "fin": "13:45", "duracion_min": 10, "utc_ini_timestamp": 1785238590},
-      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
-    },
-    {
-      "satelite": {"nombre": "SM-3.1", "max_elevacion": 15, "delta_doppler_hz": 3000},
-      "tiempo": {"inicio": "14:08", "fin": "14:18", "duracion_min": 10, "utc_ini_timestamp": 1785240500},
-      "lora": {"frecuencia_hz": 435140000, "bw_khz": 62.5, "sf": 8, "cr": 6, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
-    },
-    {
-      "satelite": {"nombre": "NORBI-2", "max_elevacion": 23, "delta_doppler_hz": 6000},
-      "tiempo": {"inicio": "22:28", "fin": "22:39", "duracion_min": 11, "utc_ini_timestamp": 1785270505},
-      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
-    },
-    {
-      "satelite": {"nombre": "TRISAT-4", "max_elevacion": 12, "delta_doppler_hz": 3000},
-      "tiempo": {"inicio": "23:54", "fin": "00:00", "duracion_min": 7, "utc_ini_timestamp": 1785275645},
-      "lora": {"frecuencia_hz": 436700000, "bw_khz": 250.0, "sf": 10, "cr": 5, "sync_word": 18, "preamble_len": 8, "implicit_header": false, "payload_len": 255, "crc_on": false, "rx_iq": false}
     }
   ]
 }

@@ -178,6 +178,7 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
     elif datos_raw is not None and len(datos_raw) > 0 and estado_rx != 0 and estado_rx != -7:
         paquetes_descartados[0] += 1
         log_info("RX", "[DESCARTADO] Paquete con estado={}, len={}".format(estado_rx, len(datos_raw)))
+    gc.collect()
     return sweep.locked
 
 
@@ -264,6 +265,7 @@ def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
                 os.remove("satelites_cazados.txt")
             except Exception:
                 pass
+        gc.collect()
         return estado_pendiente
     except Exception as e:
         log_exception("EMAIL_ESTADO", e)

@@ -32,6 +32,7 @@ _ESTADOS_WIFI = {
 # =========================================================================
 
 def conectar_wifi():
+    gc.collect()
     """
     Activa la interfaz STA y conecta con las credenciales configuradas.
     Versión robusta: sin disconnect/active(False) forzoso que puede bloquear
@@ -66,7 +67,7 @@ def conectar_wifi():
         return True
 
     wlan.active(True)
-    time.sleep_ms(300)
+    time.sleep_ms(500)
     wlan.connect(ssid, password)
 
     intentos = 0
@@ -125,8 +126,10 @@ def sincronizar_ntp():
             ntptime.host = host
             log_debug("NTP", "Intentando con {}".format(host))
             ntptime.settime()
+            gc.collect()
             return True, host
         except Exception as e:
             log_debug("NTP", "Fallo con {}: {}".format(host, e))
 
+    gc.collect()
     return False, None
