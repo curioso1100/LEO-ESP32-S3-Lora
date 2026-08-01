@@ -175,9 +175,18 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
             os.sync()
         except Exception as e:
             log_exception("CAPTURA", e)
-    elif datos_raw is not None and len(datos_raw) > 0 and estado_rx != 0 and estado_rx != -7:
+
+    # ================================================================
+    # MODIFICACIÓN DIAGNÓSTICA: loguear como WARNING los paquetes
+    # descartados para que lleguen al email y ver el estado_rx exacto.
+    # ================================================================
+    elif datos_raw is not None and len(datos_raw) > 0:
         paquetes_descartados[0] += 1
-        log_info("RX", "[DESCARTADO] Paquete con estado={}, len={}".format(estado_rx, len(datos_raw)))
+        hex_preview = datos_raw.hex()[:20] if hasattr(datos_raw, "hex") else str(datos_raw)[:20]
+        log_warn("RX", "[DESCARTADO] estado={} len={} hex={} sat={}".format(
+            estado_rx, len(datos_raw), hex_preview,
+            sat_objeto["satelite"]["nombre"] if sat_objeto else "BASE"))
+
     gc.collect()
     return sweep.locked
 
@@ -281,4 +290,4 @@ def ntp_requiere_sync():
     if time.localtime()[0] >= 2026:
         return False
     log_warn("RTC", "RTC corrupto - se requiere sincronizacion NTP")
-    return True
+    return False
