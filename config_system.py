@@ -10,7 +10,7 @@ import os
 # CONSTANTES (de configuracion.py)
 # -------------------------------------------------------------------------
 
-VERSION = "V8.4"
+VERSION = "V8.5"
 NOMBRE_PROYECTO = "LEO"
 
 _CONFIG_FILE = "config.json"
