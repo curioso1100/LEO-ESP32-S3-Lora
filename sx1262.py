@@ -29,7 +29,7 @@ gc.collect()
 # -------------------------------------------------------------------------
 
 class RadioBase:
-    """Estado base del radio."""
+    # Estado base del radio
 
     def __init__(self):
         self.crc_actual = False
@@ -282,15 +282,22 @@ class SX1262(SX126X, RadioBase):
         try:
             state = super().readData(data_mv, length)
         except AssertionError as e:
-            state = list(ERROR.keys())[list(ERROR.values()).index(str(e))]
+            try:
+                state = list(ERROR.keys())[list(ERROR.values()).index(str(e))]
+            except (ValueError, IndexError):
+                # Fallback seguro: si no podemos traducir el error,
+                # asumimos que es un paquete con CRC/HEADER error (-7)
+                state = ERR_CRC_MISMATCH
 
         ASSERT(super().startReceive())
 
-        if state == ERR_NONE or state == ERR_CRC_MISMATCH:
+        # V8.3 FIX: nunca descartar datos si el buffer se leyó.
+        # En satélites CubeSat reales, un paquete con HEADER_ERR o CRC_ERR
+        # sigue conteniendo datos útiles. El filtro de estado_rx ya se
+        # aplicará en fase3_utils.py si es necesario.
+        if length > 0:
             return bytes(data), state
-
-        else:
-            return b'', state
+        return b'', state
 
     def _startTransmit(self, data):
         if isinstance(data, bytes) or isinstance(data, bytearray):

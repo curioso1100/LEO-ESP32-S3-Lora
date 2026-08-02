@@ -101,7 +101,22 @@ def mostrar_estado_pase(sat_objeto, params, sweep_cfg, doppler_activo):
 def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                         paquetes_capturados, paquetes_descartados, debug=False):
     datos_raw, estado_rx, rssi, snr = radio.leer_paquete()
-    if datos_raw is not None and len(datos_raw) > 0 and (estado_rx == 0 or estado_rx == -7):
+
+    # ================================================================
+    # V8.3 FIX: aceptar cualquier paquete con datos durante pase activo.
+    # Los satélites CubeSat generan frecuentemente HEADER_ERR o estados
+    # intermedios, pero los datos son válidos. El fallback de frecuencia
+    # y el identificador por header se encargan del resto.
+    # En modo BASE se mantiene el filtro estricto (estado 0 o -7) para
+    # no llenar de basura.
+    # ================================================================
+    paquete_valido = (
+        datos_raw is not None and
+        len(datos_raw) > 0 and
+        (estado_rx == 0 or estado_rx == -7 or sat_objeto is not None)
+    )
+
+    if paquete_valido:
         log_info("RX", "[!] PAQUETE CAZADO! estado={} len={} RSSI={} SNR={}".format(
             estado_rx, len(datos_raw), rssi, snr))
         try:
@@ -115,24 +130,34 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                 if identificador.misma_familia(sat_nombre_detectado, sat_activo):
                     sat_nombre_detectado = sat_activo
 
-            # ================================================================
             # Fallback por frecuencia si no hay match por header
-            # Resuelve identificación de satélites sin identificacion_header
-            # (ej: SM-3.1, KOSAR-1.5) cuando llegan durante su pase agendado.
-            # ================================================================
+            # V8.4 FIX: proteger ante satélites sin clave 'lora' o estructura incompleta
             if sat_nombre_detectado is None and sat_objeto is not None:
-                frec_nominal = sat_objeto["satelite"]["lora"]["frecuencia_hz"] / 1000000.0
-                diff_khz = abs(radio.frecuencia - frec_nominal) * 1000
-                if diff_khz <= 100:   # 100 kHz de margen
-                    sat_nombre_detectado = sat_objeto["satelite"]["nombre"]
-                    log_info("ID_FALLBACK",
-                        "Header no reconocido, pero frecuencia coincide con pase activo: "
-                        "{} @ {:.3f}MHz (diff {:.1f}kHz)".format(
-                        sat_nombre_detectado, radio.frecuencia, diff_khz))
+                try:
+                    lora_cfg = sat_objeto.get("satelite", {}).get("lora")
+                    if lora_cfg is not None and "frecuencia_hz" in lora_cfg:
+                        frec_nominal = lora_cfg["frecuencia_hz"] / 1000000.0
+                        diff_khz = abs(radio.frecuencia - frec_nominal) * 1000
+                        if diff_khz <= 100:   # 100 kHz de margen
+                            sat_nombre_detectado = sat_objeto["satelite"]["nombre"]
+                            log_info("ID_FALLBACK",
+                                "Header no reconocido, pero frecuencia coincide con pase activo: "
+                                "{} @ {:.3f}MHz (diff {:.1f}kHz)".format(
+                                sat_nombre_detectado, radio.frecuencia, diff_khz))
+                    else:
+                        log_warn("ID_FALLBACK",
+                            "Satelite activo {} no tiene config 'lora' valida para fallback".format(
+                            sat_objeto["satelite"].get("nombre", "???")))
+                except Exception as e:
+                    log_warn("ID_FALLBACK", "Error en fallback por frecuencia: {}".format(e))
 
             if sat_nombre_detectado is not None:
                 sat_nombre = sat_nombre_detectado
-                frec_esperada = identificador.frecuencia_nominal(sat_nombre)
+                try:
+                    frec_esperada = identificador.frecuencia_nominal(sat_nombre)
+                except Exception as e:
+                    log_warn("ID", "Error obteniendo frecuencia nominal de {}: {}".format(sat_nombre, e))
+                    frec_esperada = None
                 if frec_esperada is not None:
                     diff_khz = abs(radio.frecuencia - frec_esperada) * 1000
                     if diff_khz > 10:
@@ -143,9 +168,12 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                     sat_objeto["satelite"]["nombre"] if sat_objeto else "NINGUNO",
                     radio.frecuencia))
                 if sat_objeto is None:
-                    frec_nom = identificador.frecuencia_nominal(sat_nombre)
-                    if frec_nom is not None:
-                        radio.forzar_frecuencia(frec_nom)
+                    try:
+                        frec_nom = identificador.frecuencia_nominal(sat_nombre)
+                        if frec_nom is not None:
+                            radio.forzar_frecuencia(frec_nom)
+                    except Exception as e:
+                        log_warn("ID", "Error forzando frecuencia para {}: {}".format(sat_nombre, e))
             else:
                 sat_nombre = "DESCONOCIDO"
 
@@ -175,11 +203,10 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
             os.sync()
         except Exception as e:
             log_exception("CAPTURA", e)
+            import sys
+            sys.print_exception(e)
 
-    # ================================================================
-    # MODIFICACIÓN DIAGNÓSTICA: loguear como WARNING los paquetes
-    # descartados para que lleguen al email y ver el estado_rx exacto.
-    # ================================================================
+    # Loguear como WARNING los paquetes descartados para diagnóstico
     elif datos_raw is not None and len(datos_raw) > 0:
         paquetes_descartados[0] += 1
         hex_preview = datos_raw.hex()[:20] if hasattr(datos_raw, "hex") else str(datos_raw)[:20]

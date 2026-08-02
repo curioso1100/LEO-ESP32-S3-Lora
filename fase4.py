@@ -374,7 +374,7 @@ def ejecutar():
         if not wifi_conectado:
             log_warn("FASE4", "Sin WiFi para enviar estado pendiente")
             apagar_wifi()
-            time.sleep(30)
+            time.sleep(60)
             incrementar_reinicios()
             reiniciar()
             return
