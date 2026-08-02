@@ -204,7 +204,7 @@
         },
         "NORBI-2": {
           "id": "57179",
-          "frec": 435600000,
+          "frec": 436650000,
           "ancho_banda_hz": "250000",
           "lora_sf": 10,
           "lora_cr": 5,
@@ -217,7 +217,7 @@
         },
         "MORSAT-1": {
           "id": "67274",
-          "frec": 435850000,
+          "frec": 435000000,
           "ancho_banda_hz": "125000",
           "lora_sf": 7,
           "lora_cr": 5,
@@ -248,6 +248,19 @@
           "ancho_banda_hz": "62500",
           "lora_sf": 8,
           "lora_cr": 6,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false
+        },
+        "HUNITY": {
+          "id": "66670",
+          "frec": 437400000,
+          "ancho_banda_hz": "125000",
+          "lora_sf": 9,
+          "lora_cr": 5,
           "implicit_header": false,
           "payload_len": 255,
           "rx_iq": false,

@@ -131,10 +131,11 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                     sat_nombre_detectado = sat_activo
 
             # Fallback por frecuencia si no hay match por header
-            # V8.4 FIX: proteger ante satélites sin clave 'lora' o estructura incompleta
+            # V8.4.2 FIX: "lora" está al nivel raíz de sat_objeto (agenda.json),
+            # NO dentro de sat_objeto["satelite"]. Usar .get("lora") directamente.
             if sat_nombre_detectado is None and sat_objeto is not None:
                 try:
-                    lora_cfg = sat_objeto.get("satelite", {}).get("lora")
+                    lora_cfg = sat_objeto.get("lora")
                     if lora_cfg is not None and "frecuencia_hz" in lora_cfg:
                         frec_nominal = lora_cfg["frecuencia_hz"] / 1000000.0
                         diff_khz = abs(radio.frecuencia - frec_nominal) * 1000
@@ -145,18 +146,22 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                                 "{} @ {:.3f}MHz (diff {:.1f}kHz)".format(
                                 sat_nombre_detectado, radio.frecuencia, diff_khz))
                     else:
-                        log_warn("ID_FALLBACK",
+                        # V8.4.2: usar log_persistente para diagnóstico remoto en el techo
+                        log_persistente("ID_FALLBACK",
                             "Satelite activo {} no tiene config 'lora' valida para fallback".format(
-                            sat_objeto["satelite"].get("nombre", "???")))
+                            sat_objeto["satelite"].get("nombre", "???")),
+                            nivel="WARN")
                 except Exception as e:
-                    log_warn("ID_FALLBACK", "Error en fallback por frecuencia: {}".format(e))
+                    # V8.4.2: persistir para diagnóstico remoto
+                    log_persistente("ID_FALLBACK", "Error en fallback por frecuencia: {}".format(e), nivel="WARN")
 
             if sat_nombre_detectado is not None:
                 sat_nombre = sat_nombre_detectado
                 try:
                     frec_esperada = identificador.frecuencia_nominal(sat_nombre)
                 except Exception as e:
-                    log_warn("ID", "Error obteniendo frecuencia nominal de {}: {}".format(sat_nombre, e))
+                    # V8.4.2: persistir para diagnóstico remoto
+                    log_persistente("ID", "Error obteniendo frecuencia nominal de {}: {}".format(sat_nombre, e), nivel="WARN")
                     frec_esperada = None
                 if frec_esperada is not None:
                     diff_khz = abs(radio.frecuencia - frec_esperada) * 1000
@@ -173,7 +178,8 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                         if frec_nom is not None:
                             radio.forzar_frecuencia(frec_nom)
                     except Exception as e:
-                        log_warn("ID", "Error forzando frecuencia para {}: {}".format(sat_nombre, e))
+                        # V8.4.2: persistir para diagnóstico remoto
+                        log_persistente("ID", "Error forzando frecuencia para {}: {}".format(sat_nombre, e), nivel="WARN")
             else:
                 sat_nombre = "DESCONOCIDO"
 
@@ -202,9 +208,11 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                 sweep.lock()
             os.sync()
         except Exception as e:
+            # V8.4.2: persistir el error en errores.log para diagnóstico remoto en el techo
             log_exception("CAPTURA", e)
             import sys
             sys.print_exception(e)
+            log_persistente("CAPTURA", "Excepcion en procesar_recepcion: {}".format(e), nivel="ERROR")
 
     # Loguear como WARNING los paquetes descartados para diagnóstico
     elif datos_raw is not None and len(datos_raw) > 0:
