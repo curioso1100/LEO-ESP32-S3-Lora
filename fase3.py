@@ -2,7 +2,6 @@
 # MÓDULO: fase3.py - SUPERVISOR DE ESCUCHA ACTIVA
 # =========================================================================
 
-
 import machine
 import time
 import json
@@ -29,10 +28,21 @@ from doppler_motor import calcular_parametros_satelite
 _SLEEP_PASE_ACTIVO_S = 5
 _SLEEP_ESPERA_S = 30
 
+# V8.5.2: archivo de lock para evitar duplicados de estado
+_ESTADO_PENDIENTE_FILE = "estado_pendiente.json"
+
 
 # =========================================================================
 # FUNCIONES AUXILIARES LOCALES (específicas del bucle)
 # =========================================================================
+
+def _estado_pendiente_existe():
+    # Devuelve True si ya hay un estado pendiente guardado
+    try:
+        return _ESTADO_PENDIENTE_FILE in os.listdir()
+    except Exception:
+        return False
+
 
 def _comprobar_prg(radio, itv):
     # Gestiona el botón PRG. Única función: marcar ITV como realizada
@@ -118,22 +128,22 @@ def ejecutar():
         incrementar_reinicios()
         placa.reiniciar()
 
-# Radio
+    # Radio
     params_ini = calcular_parametros_satelite(obtener_unix_utc_real())
     radio = RadioManager()
     radio.inicializar(params_ini)
-    log_info("FASE3_INIT", "DOPPLER={} | Freq={:.3f}MHz | SF={} | BW={} | CR={} | SW={} | LNA=0x{:02X} | HB={} | ESTADO={}min".format(
+    # V8.5.2: log simplificado (sin email_cada_min)
+    log_info("FASE3_INIT", "DOPPLER={} | Freq={:.3f}MHz | SF={} | BW={} | CR={} | SW={} | LNA=0x{:02X} | HB={} | EMAIL=FIJO".format(
         cfg.doppler_activo, radio.frecuencia, radio.sf, radio.bw, radio.cr,
-        radio.sync_word, radio.ganancia, cfg.heartbeat_activo,
-        cfg.email_cada_min if cfg.email_cada_seg > 0 else "FIJO"))
+        radio.sync_word, radio.ganancia, cfg.heartbeat_activo))
 
     # Sweep e identificación
     sweep = SweepParametros(cfg.sweep_combinaciones, cfg.sweep_intervalo,
                              cfg.sweep_activo_global, cfg.perfiles)
     ident = IdentificadorSat(cfg.perfiles, debug=cfg.debug)
 
-    # Email
-    email = EstadoEmail(cfg.horas_fijas, cfg.email_cada_seg)
+    # V8.5.2: Email solo con horas fijas (eliminado timer periodico)
+    email = EstadoEmail(cfg.horas_fijas)
 
     # Contadores (listas de 1 elemento para mutabilidad en funciones)
     paquetes_capturados = [0]
@@ -191,7 +201,7 @@ def ejecutar():
             reinicios += 1
             incrementar_reinicios()
             placa.reiniciar()
-            
+
         # Botón PRG (solo marcar ITV)
         _comprobar_prg(radio, itv)
 
@@ -245,15 +255,20 @@ def ejecutar():
             else:
                 print(">>> FIN DE PASE - MODO BASE <<<")
 
+                # V8.5.2: solo disparar si toca enviar Y no hay estado pendiente ya
                 if email.toca_enviar(t_local):
                     log_info("EMAIL", "DISPARANDO email de estado (fin de pase)!")
                     print("[EMAIL-DEBUG] DISPARANDO email de estado (fin de pase)!")
-                    email.marcar_enviado()
 
-                    if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados) is not None:
-                        email_enviado_este_ciclo = True
-                        guardar_fase(4)
-                        _intentar_transicion_fase4(radio, itv)
+                    # V8.5.2: lock - no preparar estado si ya existe uno
+                    if not _estado_pendiente_existe():
+                        if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados) is not None:
+                            email_enviado_este_ciclo = True
+                    else:
+                        log_debug("EMAIL", "Estado pendiente ya existe, saltando preparacion")
+
+                    guardar_fase(4)
+                    _intentar_transicion_fase4(radio, itv)
 
                 mostrar_proximos_pases(utc, reloj_str)
                 heartbeat_intervalo = cfg.heartbeat_base_min * 2
@@ -298,16 +313,21 @@ def ejecutar():
                     radio.ganancia, gc.mem_free(),
                     temp_str, vent_str, fs_str, email_info, itv_info))
 
-        # --- Email periódico ---
+        # --- Email periódico (horas fijas) ---
+        # V8.5.2: eliminado timer periodico, solo horas fijas
         if email.toca_enviar(t_local):
             log_info("EMAIL", "DISPARANDO email de estado!")
             print("[EMAIL-DEBUG] DISPARANDO email de estado!")
-            email.marcar_enviado()
-            
-            if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados) is not None:
-                email_enviado_este_ciclo = True
-                guardar_fase(4)
-                _intentar_transicion_fase4(radio, itv)            
+
+            # V8.5.2: lock - no preparar estado si ya existe uno
+            if not _estado_pendiente_existe():
+                if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados) is not None:
+                    email_enviado_este_ciclo = True
+            else:
+                log_debug("EMAIL", "Estado pendiente ya existe, saltando preparacion")
+
+            guardar_fase(4)
+            _intentar_transicion_fase4(radio, itv)            
 
         # --- Heartbeat ---
         heartbeat_ciclos += 1
@@ -324,7 +344,7 @@ def ejecutar():
                 sat_hb, temp, vent_on, fs_libre,
                 heartbeat_activo=cfg.heartbeat_activo
             )
-            
+
             heartbeat_escrito_este_ciclo = True
             if cfg.debug:
                 print("[HEARTBEAT] Guardado en heartbeat.log (IRQ:{})".format(irq_delta))

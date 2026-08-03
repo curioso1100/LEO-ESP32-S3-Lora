@@ -5,7 +5,6 @@
 import json
 import os
 
-
 # -------------------------------------------------------------------------
 # CONSTANTES (de configuracion.py)
 # -------------------------------------------------------------------------
@@ -15,7 +14,6 @@ NOMBRE_PROYECTO = "LEO"
 
 _CONFIG_FILE = "config.json"
 _CONFIG_CACHE = None
-
 
 # -------------------------------------------------------------------------
 # CONFIGURACIÓN
@@ -237,8 +235,7 @@ class ConfigFase3:
     def __init__(self, config):
         self._raw = config
 
-        self.email_cada_min = int(config.get("email_estado_cada_minutos", 5))
-        self.email_cada_seg = self.email_cada_min * 60
+        # V8.5.2: eliminado email_estado_cada_minutos (solo horas fijas)
         self.horas_fijas = self._parsear_horas(config.get('email_estado_horas_fijas', []))
 
         self.heartbeat_base_min = int(config.get("heartbeat_intervalo_base_min", 15))
@@ -292,12 +289,10 @@ class ConfigFase3:
 
 
 class EstadoEmail:
-    # Gestiona horas fijas de envío y persistencia
+    # V8.5.2: Solo horas fijas. Eliminado timer periodico (email_estado_cada_minutos).
 
-    def __init__(self, horas_fijas_seg, email_cada_seg):
+    def __init__(self, horas_fijas_seg):
         self._horas_fijas = horas_fijas_seg
-        self._email_cada_seg = email_cada_seg
-        self._ultimo_email_ts = time.time() if email_cada_seg > 0 else 0
         self._ultima_hora_enviada = self._cargar_ultima_hora()
 
     def _cargar_ultima_hora(self):
@@ -319,25 +314,18 @@ class EstadoEmail:
     def toca_enviar(self, t_local_tuple, forzado=False):
         if forzado:
             return True
-        if self._horas_fijas:
-            hh, mm, ss = t_local_tuple[3], t_local_tuple[4], t_local_tuple[5]
-            actual_seg = hh * 3600 + mm * 60 + ss
-            for hf_seg in self._horas_fijas:
-                diff = actual_seg - hf_seg
-                if 0 <= diff <= 30:
-                    if self._ultima_hora_enviada != hf_seg:
-                        self._ultima_hora_enviada = hf_seg
-                        self._guardar_ultima_hora(hf_seg)
-                        return True
+        if not self._horas_fijas:
             return False
-        elif self._email_cada_seg > 0:
-            if (time.time() - self._ultimo_email_ts) >= self._email_cada_seg:
-                self._ultimo_email_ts = time.time()
-                return True
+        hh, mm, ss = t_local_tuple[3], t_local_tuple[4], t_local_tuple[5]
+        actual_seg = hh * 3600 + mm * 60 + ss
+        for hf_seg in self._horas_fijas:
+            diff = actual_seg - hf_seg
+            if 0 <= diff <= 30:
+                if self._ultima_hora_enviada != hf_seg:
+                    self._ultima_hora_enviada = hf_seg
+                    self._guardar_ultima_hora(hf_seg)
+                    return True
         return False
-
-    def marcar_enviado(self):
-        self._ultimo_email_ts = time.time()
 
     def proxima_hora_str(self, t_local_tuple):
         if not self._horas_fijas:
@@ -353,8 +341,6 @@ class EstadoEmail:
     def info_str(self, t_local_tuple):
         if self._horas_fijas:
             return "EMAIL:FIJO->{}".format(self.proxima_hora_str(t_local_tuple))
-        elif self._email_cada_seg > 0:
-            return "EMAIL:{}s/{}s".format(int(time.time() - self._ultimo_email_ts), self._email_cada_seg)
         return "EMAIL:OFF"
 
 

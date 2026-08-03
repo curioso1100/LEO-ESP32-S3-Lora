@@ -2,7 +2,6 @@
 # MÓDULO: fase1.py - SINCRONIZACIÓN DIARIA E INYECCIÓN HORARIA
 # =========================================================================
 
-
 import machine
 import time
 import json
@@ -19,6 +18,7 @@ from config_system import guardar_fase, obtener_config
 
 from logger import (log_info, log_debug, log_warn, log_error, log_exception)
 from red import conectar_wifi, apagar_wifi, sincronizar_ntp
+from tiempo_satelites import obtener_unix_utc_real, obtener_desfase_espana, descargar_agenda_completa
 
 # Carga de parámetros locales
 CONFIG = obtener_config()
@@ -31,12 +31,54 @@ MAX_INTENTOS_WIFI = int(CONFIG["seguridad_hardware"]["max_intentos_wifi"])
 _VENTILADOR_GPIO = int(CONFIG.get("ventilador_gpio", 38))
 _VENTILADOR_ACTIVO = CONFIG.get("ventilador_activo", False)
 
+# V8.5: Archivo persistente para contar reintentos de fase1
+_F1_RETRY_FILE = "f1_retry.count"
+_F1_MAX_RETRIES = 10
+
+_EPOCH_OFFSET = 946684800
+
+
+def _leer_contador_retry():
+    try:
+        with open(_F1_RETRY_FILE, "r") as f:
+            return int(f.read().strip())
+    except:
+        return 0
+
+
+def _escribir_contador_retry(valor):
+    try:
+        with open(_F1_RETRY_FILE, "w") as f:
+            f.write(str(valor))
+    except Exception as e:
+        log_warn("FASE1", "No se pudo escribir contador retry: {}".format(e))
+
+
+def _borrar_contador_retry():
+    try:
+        if _F1_RETRY_FILE in os.listdir():
+            os.remove(_F1_RETRY_FILE)
+    except:
+        pass
+
+
+def _calcular_backoff(intentos):
+    if intentos <= 1:
+        return 60
+    elif intentos == 2:
+        return 120
+    else:
+        return 300
+
 
 def ejecutar():
     led_blink(1)
     led_on()
 
-    # Ventilador de mantenimiento
+    retry_count = _leer_contador_retry()
+    if retry_count > 0:
+        log_warn("FASE1", "Reintento #{} tras fallo previo de descarga".format(retry_count))
+
     ventilador = None
     if _VENTILADOR_ACTIVO:
         ventilador = Ventilador(_VENTILADOR_GPIO)
@@ -51,8 +93,6 @@ def ejecutar():
 
     if conectar_wifi():
         try:
-            from tiempo_satelites import obtener_desfase_espana, descargar_agenda_completa
-
             log_info("WIFI", "Conectado. Iniciando sincronización NTP")
 
             ok_ntp, host_usado = sincronizar_ntp()
@@ -61,8 +101,10 @@ def ejecutar():
 
             log_debug("NTP", "Sincronizado con {}".format(host_usado))
 
-            utc_ahora = int(time.time())
-            t_utc = time.localtime(utc_ahora)
+            # V8.5.2-fix: usar obtener_unix_utc_real() para que obtener_desfase_espana() reciba epoch 1970
+            utc_ahora = obtener_unix_utc_real()
+            # time.localtime() en MicroPython ESP32 usa epoch 2000, así que restamos offset
+            t_utc = time.localtime(utc_ahora - _EPOCH_OFFSET)
 
             machine.RTC().datetime((
                 int(t_utc[0]), int(t_utc[1]), int(t_utc[2]), int(t_utc[6]),
@@ -71,9 +113,9 @@ def ejecutar():
 
             desfase = obtener_desfase_espana(utc_ahora)
             local_segundos = utc_ahora + desfase
-            t_loc = time.localtime(local_segundos)
+            t_loc = time.localtime(local_segundos - _EPOCH_OFFSET)
 
-            fecha_hoy = f"{t_loc[0]}-{t_loc[1]:02d}-{t_loc[2]:02d}"
+            fecha_hoy = "{}-{:02d}-{:02d}".format(t_loc[0], t_loc[1], t_loc[2])
 
             log_debug("RTC", "Desfase España: {} seg".format(desfase))
             log_debug("RTC", "RTC configurado en UTC")
@@ -81,7 +123,8 @@ def ejecutar():
 
             gc.collect()
             if descargar_agenda_completa(fecha_hoy):
-                # Apagar ventilador ANTES de reiniciar
+                _borrar_contador_retry()
+
                 if ventilador is not None:
                     ventilador.apagar()
                     log_info("VENT", "Ventilador apagado")
@@ -92,28 +135,36 @@ def ejecutar():
                 time.sleep(2)
                 reiniciar()
             else:
-                raise RuntimeError("Fallo en la descarga de datos de la agenda satelital")
+                raise RuntimeError("Fallo en la descarga de datos de la agenda satelital (umbral N2YO no alcanzado)")
 
         except Exception as e:
             log_exception("FASE1", e)
         finally:
             apagar_wifi()
             led_off()
-            # Apagar ventilador en caso de error
             if ventilador is not None:
                 ventilador.apagar()
                 log_info("VENT", "Ventilador apagado (error)")
 
+        retry_count += 1
+        if retry_count > _F1_MAX_RETRIES:
+            log_error("FASE1", "Maximo de reintentos ({}) alcanzado. Reiniciando a fase1 limpia.".format(_F1_MAX_RETRIES))
+            _borrar_contador_retry()
+            backoff = 300
+        else:
+            _escribir_contador_retry(retry_count)
+            backoff = _calcular_backoff(retry_count)
+            log_warn("FASE1", "Reintento {}/{}. Esperando {}s antes de reiniciar...".format(
+                retry_count, _F1_MAX_RETRIES, backoff))
+
         led_patron_error(3)
-        log_warn("FASE1", "Modo resiliencia activado. Reintento en 5 minutos")
-        time.sleep(300)
+        time.sleep(backoff)
         reiniciar()
 
     else:
         log_warn("WIFI", "Imposible establecer conexión con wifi")
         apagar_wifi()
         led_off()
-        # Apagar ventilador si WiFi falla
         if ventilador is not None:
             ventilador.apagar()
             log_info("VENT", "Ventilador apagado (WiFi fallido)")

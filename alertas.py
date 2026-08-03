@@ -63,19 +63,22 @@ def _cargar_agenda_segura():
         return "Desconocida", []
 
 
-def _sock_write_all(sock, data):
+def _sock_write_all(sock, data, chunk_size=256, pausa_ms=100):
     total = len(data)
     enviados = 0
     while enviados < total:
         try:
-            n = sock.write(data[enviados:])
+            to_send = data[enviados:enviados + chunk_size]
+            n = sock.write(to_send)
             if n is None or n == 0:
-                time.sleep_ms(20)
+                time.sleep_ms(pausa_ms)
                 continue
             enviados += n
+            if enviados < total:
+                time.sleep_ms(pausa_ms)
         except OSError as e:
             if e.args[0] in (11, 35):
-                time.sleep_ms(20)
+                time.sleep_ms(pausa_ms)
                 continue
             raise
 
