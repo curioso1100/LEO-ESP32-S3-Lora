@@ -179,30 +179,6 @@
             "familia_header": "trisat"
           }
         },
-        "NORBI": {
-          "id": "46494",
-          "frec": 436700000,
-          "ancho_banda_hz": "250000",
-          "lora_sf": 10,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false,
-          "identificacion_header": {
-            "reglas": [
-              {
-                "offset": 0,
-                "valor": "0x8E",
-                "descripcion": "header_magic"
-              }
-            ],
-            "longitud_minima": 1,
-            "longitud_exacta": 143
-          }
-        },
         "NORBI-2": {
           "id": "57179",
           "frec": 436650000,
@@ -249,6 +225,19 @@
           "ancho_banda_hz": "62500",
           "lora_sf": 8,
           "lora_cr": 6,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false
+        },
+        "ASTROLINE-2": {
+          "id": "64888",
+          "frec": 436365000,
+          "ancho_banda_hz": "125000",
+          "lora_sf": 8,
+          "lora_cr": 5,
           "implicit_header": false,
           "payload_len": 255,
           "rx_iq": false,

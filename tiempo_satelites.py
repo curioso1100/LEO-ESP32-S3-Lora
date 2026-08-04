@@ -176,6 +176,8 @@ def descargar_agenda_completa(fecha_hoy):
         return False
 
     for nombre_sat, info in satelites_a_rastrear.items():
+        satelites_exitosos = 0
+        total_satelites = len(satelites_a_rastrear)
         id_norad = info["id"]
         path = (
             f"/rest/v1/satellite/radiopasses/"
@@ -226,6 +228,8 @@ def descargar_agenda_completa(fecha_hoy):
 
             cuerpo_json = buffer_caracteres[:fin_json + 1]
             json_data   = json.loads(cuerpo_json)
+
+            satelites_exitosos += 1
 
             if "passes" in json_data and json_data["passes"]:
                 for p in json_data["passes"]:
@@ -296,6 +300,14 @@ def descargar_agenda_completa(fecha_hoy):
                 pass
             gc.collect()
             time.sleep_ms(150)
+
+    if total_satelites > 0:
+        porcentaje = (satelites_exitosos / total_satelites) * 100
+        min_pct = int(c.get("min_satelites_porcentaje", 75))
+        if porcentaje < min_pct:
+            log_error("N2YO", "Umbral no alcanzado: {}/{} satelites ({:.0f}%, min {}%)".format(
+                satelites_exitosos, total_satelites, porcentaje, min_pct))
+            return False
 
     try:
         pases_consolidados.sort(key=lambda x: x["utc_ini_timestamp"])
