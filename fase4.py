@@ -7,6 +7,7 @@ import time
 import os
 import gc
 
+import placa
 from placa import led_on, led_off, led_blink, reiniciar
 from config_system import guardar_fase, obtener_config, version, nombre_proyecto, incrementar_reinicios, leer_f4_fallos, guardar_f4_fallos
 from logger import (

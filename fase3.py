@@ -53,26 +53,17 @@ def _comprobar_prg(radio, itv):
 
 
 def _intentar_transicion_fase4(radio, itv=None):
-    # Verifica si se debe transicionar a fase4 y reinicia
+    # V8.5.3: completa la transicion a fase4 reiniciando SIEMPRE.
+    # El llamador ya debe haber guardado fase=4 si es necesario.
+    # No verificamos estado.json para evitar fallos por buffer de flash no sincronizado.
     try:
-        with open("estado.json", "r") as f:
-            estado = json.load(f)
-            if estado.get("fase", 3) == 4:
-                log_info("FASE3", "Transicion a fase4 detectada - reiniciando")
-                radio.standby()
-                os.sync()
-                time.sleep_ms(500)
-                placa.reiniciar()
-            # ITV: si hay email ITV pendiente, también forzar fase4
-            if itv is not None and itv.hay_email_itv_pendiente():
-                log_warn("ITV", "Email ITV pendiente detectado -> forzando transicion a fase4")
-                guardar_fase(4)
-                radio.standby()
-                os.sync()
-                time.sleep_ms(500)
-                placa.reiniciar()
+        os.sync()
+        log_info("FASE3", "Transicion a fase4 - reiniciando")
+        radio.standby()
+        time.sleep_ms(500)
+        placa.reiniciar()
     except Exception as e:
-        log_warn("FASE3", "Error verificando fase: {}".format(e))
+        log_warn("FASE3", "Error en transicion a fase4: {}".format(e))
 
 
 # =========================================================================
@@ -255,20 +246,23 @@ def ejecutar():
             else:
                 print(">>> FIN DE PASE - MODO BASE <<<")
 
-                # V8.5.2: solo disparar si toca enviar Y no hay estado pendiente ya
+                # V8.5.3: solo transicionar si realmente hay estado que enviar
                 if email.toca_enviar(t_local):
                     log_info("EMAIL", "DISPARANDO email de estado (fin de pase)!")
                     print("[EMAIL-DEBUG] DISPARANDO email de estado (fin de pase)!")
 
-                    # V8.5.2: lock - no preparar estado si ya existe uno
+                    hay_estado = False
                     if not _estado_pendiente_existe():
                         if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados) is not None:
                             email_enviado_este_ciclo = True
+                            hay_estado = True
                     else:
                         log_debug("EMAIL", "Estado pendiente ya existe, saltando preparacion")
+                        hay_estado = True
 
-                    guardar_fase(4)
-                    _intentar_transicion_fase4(radio, itv)
+                    if hay_estado:
+                        guardar_fase(4)
+                        _intentar_transicion_fase4(radio, itv)
 
                 mostrar_proximos_pases(utc, reloj_str)
                 heartbeat_intervalo = cfg.heartbeat_base_min * 2
@@ -314,20 +308,23 @@ def ejecutar():
                     temp_str, vent_str, fs_str, email_info, itv_info))
 
         # --- Email periódico (horas fijas) ---
-        # V8.5.2: eliminado timer periodico, solo horas fijas
+        # V8.5.3: eliminado timer periodico, solo horas fijas
         if email.toca_enviar(t_local):
             log_info("EMAIL", "DISPARANDO email de estado!")
             print("[EMAIL-DEBUG] DISPARANDO email de estado!")
 
-            # V8.5.2: lock - no preparar estado si ya existe uno
+            hay_estado = False
             if not _estado_pendiente_existe():
                 if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados) is not None:
                     email_enviado_este_ciclo = True
+                    hay_estado = True
             else:
                 log_debug("EMAIL", "Estado pendiente ya existe, saltando preparacion")
+                hay_estado = True
 
-            guardar_fase(4)
-            _intentar_transicion_fase4(radio, itv)            
+            if hay_estado:
+                guardar_fase(4)
+                _intentar_transicion_fase4(radio, itv)
 
         # --- Heartbeat ---
         heartbeat_ciclos += 1
