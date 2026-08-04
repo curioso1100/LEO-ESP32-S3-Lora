@@ -396,8 +396,30 @@ class ITVManager:
 
     def _preparar_email_itv(self, utc_actual, motivos, dias_desde_ultima_itv):
         temps = self._estado["temperaturas_max_semanal"]
-        temp_max_7d = max([t[1] for t in temps[-7:]], default=None) if temps else None
-        temp_max_30d = max([t[1] for t in temps[-30:]], default=None) if temps else None
+
+        # fallback a _temp_max_hoy si no hay historial semanal aun
+        temp_max_7d = None
+        if temps:
+            temp_max_7d = max([t[1] for t in temps[-7:]], default=None)
+        if temp_max_7d is None:
+            temp_max_7d = self._estado.get("_temp_max_hoy", None)
+
+        temp_max_30d = None
+        if temps:
+            temp_max_30d = max([t[1] for t in temps[-30:]], default=None)
+
+        # Formatear temperaturas; evitar mostrar 'None C'
+        def _fmt_temp(t):
+            if t is None:
+                return "N/D (sin datos)"
+            try:
+                return "{:.1f}C".format(t)
+            except Exception:
+                return str(t)
+
+        temp_max_7d_str = _fmt_temp(temp_max_7d)
+        temp_max_30d_str = _fmt_temp(temp_max_30d)
+
         capturas_total = sum(c[1] for c in self._estado["capturas_historico"]) if self._estado["capturas_historico"] else 0
 
         rssi_resumen = {}
@@ -417,26 +439,27 @@ class ITVManager:
                 "reinicios_7d": self._estado["reinicios_7d"],
                 "reinicios_total": self._estado["reinicios_ultima_semana"],
                 "ventilador_activaciones_7d": self._estado["ventilador_activaciones_7d"],
-                "temp_max_7d": temp_max_7d,
-                "temp_max_30d": temp_max_30d,
+                "temp_max_7d": temp_max_7d_str,
+                "temp_max_30d": temp_max_30d_str,
                 "capturas_total_estimado": capturas_total,
                 "capturas_7d": self._estado["capturas_ultimos_7d"],
                 "emails_7d": self._estado["emails_enviados_ultimos_7d"],
                 "rssi_por_satelite": rssi_resumen,
             },
+
             "checklist": [
-                "Caja estanca: sellos de silicona intactos? condensacion interior?",
-                "Antena: firme? oxido en conector SMA? cable coaxial sin dobleces?",
-                "PCB: puntos de soldadura verdes (sulfatacion)? insectos/moho?",
-                "Ventilador: gira libre? ruido anomalo? obstruido por polen/polvo?",
-                "Pre-LNA: conector firme? calor excesivo?",
-                "Alimentacion: cable USB/C sin peladuras? conector barrel jack firme?",
-                "PSRAM: sigue sin inicializar? (esperado, anotar)",
+                "Caja estanca (sellos, condensacion)",
+                "Antena (firme, oxido SMA, cable)",
+                "PCB (sulfatacion, insectos, moho)",
+                "Ventilador (gira libre, polvo)",
+                "Pre-LNA (conector, calor)",
+                "Alimentacion (cable, conector)",
+                "PSRAM (sin inicializar - esperado)",
             ],
             "acciones": [
-                "Todo OK -> volver a subir, resetear contador ITV",
-                "Problema menor -> reparar, subir, programar ITV en 30 dias",
-                "Problema grave -> bajar permanentemente, diagnosticar en mesa",
+                "OK -> subir, resetear ITV (pulsa PRG en fase3)",
+                "Menor -> reparar, subir, ITV en 30 dias",
+                "Grave -> bajar, diagnosticar en mesa",
             ]
         }
 
@@ -449,6 +472,7 @@ class ITVManager:
             log_warn("ITV", "No se pudo guardar email ITV: {}".format(e))
 
     def leer_email_itv_pendiente(self):
+        # Lee y BORRA el email ITV pendiente. Cuidado: si falla el envío se pierde
         try:
             with open(ITV_EMAIL_FICHERO, "r") as f:
                 data = json.load(f)
@@ -459,6 +483,22 @@ class ITVManager:
             return data
         except (OSError, ValueError):
             return None
+
+    def obtener_email_itv_pendiente(self):
+        # Lee el email ITV pendiente SIN borrarlo. Usar en fase2 para envío seguro
+        try:
+            with open(ITV_EMAIL_FICHERO, "r") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return None
+
+    def borrar_email_itv_pendiente(self):
+        # Borra el archivo de email ITV pendiente tras envío exitoso
+        try:
+            os.remove(ITV_EMAIL_FICHERO)
+            log_debug("ITV", "Email ITV pendiente borrado tras envío exitoso")
+        except OSError:
+            pass
 
     def hay_email_itv_pendiente(self):
         try:
@@ -492,6 +532,13 @@ class ITVManager:
         self._estado["ultimo_timestamp_diario"] = utc_actual
         self._itv_pendiente = False
         self._motivo_itv = []
+        # borrar email ITV pendiente si existe
+        try:
+            if ITV_EMAIL_FICHERO in os.listdir():
+                os.remove(ITV_EMAIL_FICHERO)
+                log_debug("ITV", "Email ITV pendiente borrado tras marcar ITV realizada")
+        except OSError:
+            pass
         self._guardar_estado()
         log_info("ITV", "ITV realizada. Motivo: {}".format(motivo))
 
@@ -568,7 +615,7 @@ def main():
     print("     o pulsa PRG 1 vez para marcarla realizada.")
     print("  2. Desde consola: ejecuta:")
     print("     >>> from config_system import guardar_fase")
-    print("     >>> guardar_fase(4)")
+    print("     >>> guardar_fase(2)")
     print("     >>> import machine; machine.reset()")
     print("=" * 50)
 

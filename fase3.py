@@ -28,9 +28,7 @@ from doppler_motor import calcular_parametros_satelite
 _SLEEP_PASE_ACTIVO_S = 5
 _SLEEP_ESPERA_S = 30
 
-# V8.5.2: archivo de lock para evitar duplicados de estado
 _ESTADO_PENDIENTE_FILE = "estado_pendiente.json"
-
 
 # =========================================================================
 # FUNCIONES AUXILIARES LOCALES (específicas del bucle)
@@ -52,8 +50,8 @@ def _comprobar_prg(radio, itv):
         placa.led_blink(5, pausa_ms=100)
 
 
-def _intentar_transicion_fase4(radio, itv=None):
-    # V8.5.3: completa la transicion a fase4 reiniciando SIEMPRE.
+def _intentar_transicion_fase4(radio):
+    # Completa la transicion a fase4 reiniciando SIEMPRE.
     # El llamador ya debe haber guardado fase=4 si es necesario.
     # No verificamos estado.json para evitar fallos por buffer de flash no sincronizado.
     try:
@@ -123,7 +121,7 @@ def ejecutar():
     params_ini = calcular_parametros_satelite(obtener_unix_utc_real())
     radio = RadioManager()
     radio.inicializar(params_ini)
-    # V8.5.2: log simplificado (sin email_cada_min)
+    # Log simplificado (sin email_cada_min)
     log_info("FASE3_INIT", "DOPPLER={} | Freq={:.3f}MHz | SF={} | BW={} | CR={} | SW={} | LNA=0x{:02X} | HB={} | EMAIL=FIJO".format(
         cfg.doppler_activo, radio.frecuencia, radio.sf, radio.bw, radio.cr,
         radio.sync_word, radio.ganancia, cfg.heartbeat_activo))
@@ -133,7 +131,7 @@ def ejecutar():
                              cfg.sweep_activo_global, cfg.perfiles)
     ident = IdentificadorSat(cfg.perfiles, debug=cfg.debug)
 
-    # V8.5.2: Email solo con horas fijas (eliminado timer periodico)
+    # Email solo con horas fijas (eliminado timer periodico)
     email = EstadoEmail(cfg.horas_fijas)
 
     # Contadores (listas de 1 elemento para mutabilidad en funciones)
@@ -246,7 +244,7 @@ def ejecutar():
             else:
                 print(">>> FIN DE PASE - MODO BASE <<<")
 
-                # V8.5.3: solo transicionar si realmente hay estado que enviar
+                # solo transicionar si realmente hay estado que enviar
                 if email.toca_enviar(t_local):
                     log_info("EMAIL", "DISPARANDO email de estado (fin de pase)!")
                     print("[EMAIL-DEBUG] DISPARANDO email de estado (fin de pase)!")
@@ -262,7 +260,7 @@ def ejecutar():
 
                     if hay_estado:
                         guardar_fase(4)
-                        _intentar_transicion_fase4(radio, itv)
+                        _intentar_transicion_fase4(radio)
 
                 mostrar_proximos_pases(utc, reloj_str)
                 heartbeat_intervalo = cfg.heartbeat_base_min * 2
@@ -307,8 +305,7 @@ def ejecutar():
                     radio.ganancia, gc.mem_free(),
                     temp_str, vent_str, fs_str, email_info, itv_info))
 
-        # --- Email periódico (horas fijas) ---
-        # V8.5.3: eliminado timer periodico, solo horas fijas
+        # --- Email periódico (horas fijas) --- eliminado timer periodico, solo horas fijas
         if email.toca_enviar(t_local):
             log_info("EMAIL", "DISPARANDO email de estado!")
             print("[EMAIL-DEBUG] DISPARANDO email de estado!")
@@ -324,7 +321,7 @@ def ejecutar():
 
             if hay_estado:
                 guardar_fase(4)
-                _intentar_transicion_fase4(radio, itv)
+                _intentar_transicion_fase4(radio)
 
         # --- Heartbeat ---
         heartbeat_ciclos += 1
@@ -365,10 +362,12 @@ def ejecutar():
             utc_actual=utc,
             t_local_tuple=t_local
         )
+        # No transiciona a fase4 por ITV. El email ITV se envía
+        # desde fase2 una vez al día. Aquí solo se prepara el archivo pendiente.
         itv_necesaria, motivos_itv = itv.evaluar(utc, t_local)
-        if itv_necesaria and not itv.hay_email_itv_pendiente():
-            guardar_fase(4)
-            _intentar_transicion_fase4(radio, itv)
+        if itv_necesaria:
+            log_warn("ITV", "ALERTA ITV detectada: {}. Email preparado para fase2.".format(
+                "; ".join(motivos_itv)))
 
         # ITV: reset flags para siguiente ciclo
         heartbeat_escrito_este_ciclo = False

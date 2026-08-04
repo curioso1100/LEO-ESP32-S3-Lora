@@ -1,5 +1,5 @@
 #######################################################
-# fase4.py - ENVIO DE EMAIL DE ESTADO PENDIENTE + ITV
+# fase4.py - ENVIO DE EMAIL DE ESTADO PENDIENTE
 #######################################################
 
 import machine
@@ -279,54 +279,6 @@ def enviar_email_estado(estado_pendiente):
         return False
 
 
-def _enviar_email_itv_pendiente():
-    try:
-        from itv_manager import ITVManager
-        gc.collect()
-    except ImportError:
-        log_warn("ITV_F4", "itv_manager.py no disponible")
-        return False
-
-    itv = ITVManager(CONFIG)
-    if not itv.hay_email_itv_pendiente():
-        return False
-
-    email_data = itv.leer_email_itv_pendiente()
-    if email_data is None:
-        return False
-
-    gc.collect()
-
-    import alertas
-    exito = alertas.enviar_email_itv(email_data, DEBUG_MODO)
-
-    if exito:
-        log_info("ITV_F4", "Email ITV enviado correctamente")
-    else:
-        log_warn("ITV_F4", "Fallo enviando email ITV. Se reintentara en proximo ciclo.")
-
-    return exito
-
-
-def _detectar_confirmacion_itv_prg():
-    try:
-        from itv_manager import ITVManager
-        gc.collect()
-    except ImportError:
-        return False
-
-    itv = ITVManager(CONFIG)
-    if not itv.hay_email_itv_pendiente():
-        return False
-
-    if placa.detectar_pulsacion_prg():
-        log_info("ITV_F4", "Confirmacion ITV detectada (PRG en fase4)")
-        itv.marcar_itv_realizada(obtener_unix_utc_real(), "boton_prg_fase4")
-        led_blink(5, pausa_ms=100)
-        return True
-    return False
-
-
 def ejecutar():
     led_blink(4)
     led_on()
@@ -350,13 +302,6 @@ def ejecutar():
         elif fallos >= 2:
             log_warn("FASE4", "Backoff: esperando 3 min antes de reintentar (fallo {}/5)".format(fallos))
             time.sleep(180)
-
-        if _detectar_confirmacion_itv_prg():
-            log_info("FASE4", "ITV confirmada via PRG. Volviendo a fase3.")
-            guardar_fase(3)
-            apagar_wifi()
-            reiniciar()
-            return
 
         estado_pendiente = leer_estado_pendiente()
 
@@ -389,10 +334,6 @@ def ejecutar():
         ok_ntp, servidor = sincronizar_ntp()
         if ok_ntp:
             log_debug("NTP", "Sincronizado con {}".format(servidor))
-
-        itv_enviado = _enviar_email_itv_pendiente()
-        if itv_enviado:
-            log_info("FASE4", "Email ITV enviado. Procediendo con email de estado normal...")
 
         if time.ticks_diff(time.ticks_ms(), t_inicio_fase4) > MAX_FASE4_MS:
             log_warn("FASE4", "WATCHDOG: excedido tiempo maximo antes de email, abortando")

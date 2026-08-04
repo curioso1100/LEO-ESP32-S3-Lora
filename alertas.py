@@ -1,5 +1,5 @@
 # =========================================================================
-# MODULO: alertas.py
+# MODULO: alertas.py  V8.5.4
 # =========================================================================
 
 import gc
@@ -315,82 +315,68 @@ def construir_email_itv(email_data):
     acciones = email_data.get("acciones", [])
     dias = email_data.get("dias_desde_ultima_itv", 0)
     timestamp = email_data.get("timestamp", 0)
+    timestamp_envio = email_data.get("timestamp_envio", 0)
 
-    asunto = "{}: ITV {} Revision periodica - {}".format(
+    asunto = "{}: ITV {} - {}".format(
         nombre_proyecto(), version(),
         "; ".join(motivos[:2]) if motivos else "rutinaria"
     )
 
+    # Fechas
+    fecha_detectado = formatear_fecha_utc(timestamp) if timestamp else "N/A"
+    fecha_envio = formatear_fecha_utc(timestamp_envio) if timestamp_envio else "N/A"
+
     partes = [
-        "=" * 60,
-        "  I T V   -   R E V I S I O N   P E R I O D I C A   L E O {}".format(version()),
-        "=" * 60,
-        "",
-        "Fecha: {}".format(formatear_fecha_utc(timestamp)),
+        "ITV LEO {} - Revision periodica".format(version()),
+        "=" * 50,
+        "Detectado: {}".format(fecha_detectado),
+        "Enviado:   {}".format(fecha_envio),
         "Dias desde ultima ITV: {}".format(dias),
         "",
-        "-" * 60,
-        "  MOTIVOS DE LA ALERTA",
-        "-" * 60,
+        "ALERTAS:",
     ]
     for m in motivos:
         partes.append("  [!] {}".format(m))
     partes.append("")
 
     partes.extend([
-        "-" * 60,
-        "  METRICAS DEL SISTEMA",
-        "-" * 60,
-        "  Dias acumulados:        {}".format(metricas.get("dias_acumulados", "N/A")),
-        "  Heartbeats acumulados:  {}".format(metricas.get("heartbeats_acumulados", "N/A")),
-        "  Reinicios (7d):         {}".format(metricas.get("reinicios_7d", "N/A")),
-        "  Reinicios (total):      {}".format(metricas.get("reinicios_total", "N/A")),
-        "  Ventilador activ. (7d): {}".format(metricas.get("ventilador_activaciones_7d", "N/A")),
-        "  Temp max (7d):          {} C".format(metricas.get("temp_max_7d", "N/A")),
-        "  Temp max (30d):         {} C".format(metricas.get("temp_max_30d", "N/A")),
-        "  Capturas total (est):   {}".format(metricas.get("capturas_total_estimado", "N/A")),
-        "  Capturas (7d):          {}".format(metricas.get("capturas_7d", "N/A")),
-        "  Emails enviados (7d):   {}".format(metricas.get("emails_7d", "N/A")),
+        "METRICAS:",
+        "  Dias: {} | HB: {} | Reinicios: {}".format(
+            metricas.get("dias_acumulados", "N/A"),
+            metricas.get("heartbeats_acumulados", "N/A"),
+            metricas.get("reinicios_7d", "N/A")),
+        "  Ventilador: {} activaciones (7d)".format(
+            metricas.get("ventilador_activaciones_7d", "N/A")),
+        "  Temp max: {}".format(metricas.get("temp_max_7d", "N/A")),
+        "  Capturas: {} total | {} (7d)".format(
+            metricas.get("capturas_total_estimado", "N/A"),
+            metricas.get("capturas_7d", "N/A")),
+        "  Emails: {} (7d)".format(metricas.get("emails_7d", "N/A")),
         "",
     ])
 
     rssi_resumen = metricas.get("rssi_por_satelite", {})
     if rssi_resumen:
-        partes.extend([
-            "-" * 60,
-            "  RSSI POR SATELITE",
-            "-" * 60,
-        ])
+        partes.append("RSSI:")
         for sat, val in rssi_resumen.items():
             partes.append("  {}: {}".format(sat, val))
         partes.append("")
 
-    partes.extend([
-        "-" * 60,
-        "  CHECKLIST FISICO (marcar al bajar la placa)",
-        "-" * 60,
-    ])
-    for i, item in enumerate(checklist, 1):
-        partes.append("  [{}] {}".format(i, item))
-    partes.append("")
+    if checklist:
+        partes.append("CHECKLIST (revisar al bajar):")
+        for i, item in enumerate(checklist, 1):
+            partes.append("  [{}] {}".format(i, item))
+        partes.append("")
+
+    if acciones:
+        partes.append("ACCION:")
+        for i, acc in enumerate(acciones, 1):
+            partes.append("  {}. {}".format(i, acc))
+        partes.append("")
 
     partes.extend([
-        "-" * 60,
-        "  ACCIONES POSIBLES",
-        "-" * 60,
-    ])
-    for i, acc in enumerate(acciones, 1):
-        partes.append("  {}. {}".format(i, acc))
-    partes.append("")
-
-    partes.extend([
-        "=" * 60,
-        "Para marcar ITV como REALIZADA y resetear contadores:",
-        "  1. Baja la placa del techo",
-        "  2. Revisa el checklist fisico",
-        "  3. Pulsa PRG 1 vez en modo fase3",
-        "  4. Sube la placa de nuevo",
-        "=" * 60,
+        "=" * 50,
+        "Para marcar ITV realizada: pulsa PRG 1 vez en fase3",
     ])
 
     return asunto, "\n".join(partes)

@@ -53,7 +53,7 @@ def _reset_wifi_agresivo(wlan):
     except Exception:
         pass
 
-    # CRÍTICO: el chip WiFi del ESP32 necesita >=1s para apagarse
+    # CRÍTICO: el chip WiFi del ESP32 necesita >=1.5s para apagarse
     # completamente y liberar los buffers internos.
     time.sleep_ms(1500)
 
@@ -62,18 +62,33 @@ def _reset_wifi_agresivo(wlan):
     except Exception:
         pass
 
-    # Tiempo para que el interfaz se estabilice tras encender
-    time.sleep_ms(1000)
+    time.sleep_ms(2500)
+
+
+def _intentar_conexion(wlan, ssid, password, max_intentos, etiqueta=""):
+    # Intenta conectar y espera hasta max_intentos ciclos de 2s. Retorna (conectado: bool, estado_final: int)
+    wlan.connect(ssid, password)
+    time.sleep_ms(800) 
+
+    intentos = 0
+    ultimo_estado = -1
+    while not wlan.isconnected() and intentos < max_intentos:
+        estado = wlan.status()
+        if estado != ultimo_estado:
+            ultimo_estado = estado
+            log_debug("WIFI", "{}Intento {}/{}  Estado: {}".format(
+                etiqueta, intentos + 1, max_intentos,
+                _ESTADOS_WIFI.get(estado, "DESCONOCIDO({})".format(estado))))
+        time.sleep(2)
+        intentos += 1
+
+    return wlan.isconnected(), wlan.status()
 
 
 def conectar_wifi():
     gc.collect()
-    """
-    Activa la interfaz STA y conecta con las credenciales configuradas.
-    Versión V8.4: incluye reset agresivo del módulo WiFi antes de conectar
-    para evitar estados corruptos heredados de soft reboots previos.
-    """
-    # Leer config localmente
+    # Activa la interfaz STA y conecta con las credenciales configuradas.
+    # Doble ronda de intento con distintas estrategias de reset para solucionar el bug de autenticación intermitente del ESP32-S3.
     try:
         with open("config.json", "r") as cf:
             c = json.load(cf)
@@ -88,10 +103,12 @@ def conectar_wifi():
         log_warn("WIFI", "SSID vacio. Abortando.")
         return False
 
+    log_debug("WIFI", "SSID='{}' | PASS_len={}".format(ssid, len(password)))
+
     # --- Calentamiento WiFi tras encendido en frío (POWERON) ---
     if machine.reset_cause() == 1:  # POWERON_RESET
         log_debug("WIFI", "POWERON detectado. Esperando calentamiento RF...")
-        time.sleep_ms(1500)
+        time.sleep_ms(2000)
 
     wlan = network.WLAN(network.STA_IF)
 
@@ -100,40 +117,46 @@ def conectar_wifi():
         log_info("WIFI", "Ya habia conexion previa. IP: {}".format(wlan.ifconfig()[0]))
         return True
 
-    # --- V8.4 FIX: reset agresivo para limpiar estado heredado ---
-    # Tras soft reboots repetidos (fase3->fase4), el módulo WiFi interno
-    # del ESP32 acumula basura. Sin este reset, connect() entra en bucle
-    # de estados 1001/202 y nunca asocia.
-    log_debug("WIFI", "Reset agresivo del interfaz STA...")
+    # ============================================================
+    # RONDA 1: reset agresivo + conexión
+    # ============================================================
+    log_debug("WIFI", "Ronda 1: reset agresivo del interfaz STA...")
     _reset_wifi_agresivo(wlan)
 
-    # --- Intentar conexión ---
-    wlan.connect(ssid, password)
-    time.sleep_ms(500)
+    conectado, estado_final = _intentar_conexion(wlan, ssid, password, max_intentos, "R1 ")
 
-    intentos = 0
-    ultimo_estado = -1
-    while not wlan.isconnected() and intentos < max_intentos:
-        estado = wlan.status()
-        if estado != ultimo_estado:
-            ultimo_estado = estado
-            log_debug("WIFI", "Intento {}/{}  Estado: {}".format(
-                intentos + 1, max_intentos,
-                _ESTADOS_WIFI.get(estado, "DESCONOCIDO({})".format(estado))))
-        time.sleep(2)
-        intentos += 1
-
-    if wlan.isconnected():
-        log_info("WIFI", "Conectado! IP: {}".format(wlan.ifconfig()[0]))
+    if conectado:
+        log_info("WIFI", "Conectado (Ronda 1)! IP: {}".format(wlan.ifconfig()[0]))
         return True
-    else:
-        estado_final = wlan.status()
-        log_warn("WIFI", "Imposible conectar. Estado final: {}".format(estado_final))
-        # Apagar limpiamente antes de salir para no dejar basura
-        # al siguiente ciclo de fase4
-        _reset_wifi_agresivo(wlan)
-        led_patron_error()
-        return False
+
+    log_warn("WIFI", "Ronda 1 fallo. Estado final: {}".format(
+        _ESTADOS_WIFI.get(estado_final, "DESCONOCIDO({})".format(estado_final))))
+
+    # ============================================================
+    # RONDA 2: solo disconnect + delay largo + reconexión suave
+    # El reset agresivo a veces deja el PHY del ESP32-S3 en estado
+    # inconsistente. Un simple disconnect + espera suele funcionar.
+    # ============================================================
+    log_debug("WIFI", "Ronda 2: reconexion suave tras delay...")
+    try:
+        wlan.disconnect()
+    except Exception:
+        pass
+    time.sleep_ms(3000)  # Espera larga para que el AP libere la sesión
+
+    conectado, estado_final = _intentar_conexion(wlan, ssid, password, max_intentos, "R2 ")
+
+    if conectado:
+        log_info("WIFI", "Conectado (Ronda 2)! IP: {}".format(wlan.ifconfig()[0]))
+        return True
+
+    log_warn("WIFI", "Ronda 2 fallo. Estado final: {}".format(
+        _ESTADOS_WIFI.get(estado_final, "DESCONOCIDO({})".format(estado_final))))
+
+    # --- Apagar limpiamente antes de salir ---
+    _reset_wifi_agresivo(wlan)
+    led_patron_error()
+    return False
 
 
 def apagar_wifi():

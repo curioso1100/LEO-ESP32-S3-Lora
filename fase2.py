@@ -1,5 +1,5 @@
 # =========================================================================
-# MÓDULO: fase2.py - REPORTE DIARIO DE PASES
+# MÓDULO: fase2.py - REPORTE DIARIO DE PASES + ITV
 # =========================================================================
 
 import machine
@@ -26,8 +26,46 @@ ARCHIVO_LOGS = "logs.txt"
 DELAY_POST_CONEXION = 3  # segundos; estabiliza interfaz de red antes de envío
 
 
+def _enviar_email_itv_pendiente():
+    # Envía el email ITV pendiente si existe. Retorna True si se envió o no había
+    try:
+        from itv_manager import ITVManager
+        gc.collect()
+    except ImportError:
+        log_warn("ITV_F2", "itv_manager.py no disponible")
+        return True  # No hay nada que hacer
+
+    itv = ITVManager(CONFIG)
+    if not itv.hay_email_itv_pendiente():
+        return True
+
+    email_data = itv.obtener_email_itv_pendiente()
+    if email_data is None:
+        return True
+
+    # V8.5.4: añadir timestamp de envío para distinguir de fecha de detección
+    try:
+        from tiempo_satelites import obtener_unix_utc_real
+        email_data["timestamp_envio"] = obtener_unix_utc_real()
+    except Exception:
+        pass
+
+    gc.collect()
+
+    import alertas
+    exito = alertas.enviar_email_itv(email_data, DEBUG_MODO)
+
+    if exito:
+        itv.borrar_email_itv_pendiente()
+        log_info("ITV_F2", "Email ITV enviado correctamente")
+    else:
+        log_warn("ITV_F2", "Fallo enviando email ITV. Se reintentara manana.")
+
+    return exito
+
+
 def ejecutar():
-    # Envía reporte diario de pases y volcado asíncrono de logs.
+    # Envía reporte diario de pases, volcado asíncrono de logs y email ITV.
     # Siempre finaliza avanzando a Fase 3 y reiniciando el dispositivo.
     led_blink(2)
     led_on()
@@ -86,6 +124,12 @@ def ejecutar():
                     log_error("FASE2", "Error accediendo a {}: {}".format(ARCHIVO_LOGS, exc))
                 except Exception as exc:
                     log_exception("FASE2", "Error inesperado con logs: {}".format(exc))
+
+            # --- Envío 3: Email ITV (máximo una vez al día) ---
+            try:
+                _enviar_email_itv_pendiente()
+            except Exception as exc:
+                log_exception("FASE2", "Fallo envío email ITV: {}".format(exc))
 
             # --- Resumen de resultados ---
             ok_principal = "OK" if resultado_principal else "FALLO"
