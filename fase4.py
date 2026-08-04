@@ -191,6 +191,12 @@ def enviar_email_estado(estado_pendiente):
 
     log_info("FASE4", "Email 1 (Estado+Heartbeats) enviado correctamente")
 
+    delay_seg = CONFIG.get("delay_entre_emails_seg", 30)
+    if delay_seg > 0 and num_cap > 0:
+        log_info("FASE4", "Esperando {}s antes de enviar capturas (anti-rate-limit)...".format(delay_seg))
+        time.sleep(delay_seg)
+        gc.collect()
+
     if num_cap <= 0:
         log_info("FASE4", "Sin capturas para enviar.")
         borrar_estado_pendiente()
@@ -255,7 +261,7 @@ def enviar_email_estado(estado_pendiente):
             num_trozo, total_trozos))
 
         if num_trozo < total_trozos:
-            time.sleep_ms(500)
+            time.sleep_ms(1000)
             gc.collect()
 
         linea_actual = linea_fin + 1
