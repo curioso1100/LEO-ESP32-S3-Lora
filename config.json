@@ -282,5 +282,6 @@
     "dias_sin_capturas": 7,
     "dias_sin_heartbeat_enviado": 3
   },
-  "delay_entre_emails_seg": 45
+  "delay_entre_emails_seg": 45,
+  "max_hb_email": 40
 }

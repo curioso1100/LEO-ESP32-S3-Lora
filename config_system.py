@@ -235,7 +235,6 @@ class ConfigFase3:
     def __init__(self, config):
         self._raw = config
 
-        # V8.5.2: eliminado email_estado_cada_minutos (solo horas fijas)
         self.horas_fijas = self._parsear_horas(config.get('email_estado_horas_fijas', []))
 
         self.heartbeat_base_min = int(config.get("heartbeat_intervalo_base_min", 15))
@@ -267,6 +266,11 @@ class ConfigFase3:
         self.max_logs_txt_kb = int(config.get("max_logs_txt_kb", 50))
         self.max_logs_txt_lineas = int(config.get("max_logs_txt_lineas", 200))
 
+        # conectar max_hb_acumulados a config.json
+        self.max_hb_acumulados = int(config.get("max_hb_acumulados", 200))
+        # max_hb_email para fase4 (fallback 40)
+        self.max_hb_email = int(config.get("max_hb_email", 40))
+
         self.debug = config.get("debug_consola", True)
         self.perfiles = config.get("perfiles_satelites", {})
 
@@ -289,7 +293,7 @@ class ConfigFase3:
 
 
 class EstadoEmail:
-    # V8.5.2: Solo horas fijas. Eliminado timer periodico (email_estado_cada_minutos).
+    # Solo horas fijas. Eliminado timer periodico (email_estado_cada_minutos).
 
     def __init__(self, horas_fijas_seg):
         self._horas_fijas = horas_fijas_seg

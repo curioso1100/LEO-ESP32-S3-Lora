@@ -25,8 +25,9 @@ DEBUG_MODO = CONFIG.get("debug_consola", True)
 _MIN_RAM_ENVIO = 22000
 # Tamano maximo de payload por email de capturas (chars)
 _MAX_PAYLOAD_CAPTURAS_CHARS = 8500
-# Heartbeats maximo por email (limite buffer SSL ESP32 ~2KB)
-_MAX_HB_EMAIL = 20
+# Heartbeats maximo por email. 
+# Valor configurable via config.json (clave max_hb_email). Fallback 40.
+_MAX_HB_EMAIL = int(CONFIG.get("max_hb_email", 40))
 
 
 def _ram_libre():

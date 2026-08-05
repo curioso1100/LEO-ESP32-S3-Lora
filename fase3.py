@@ -251,7 +251,7 @@ def ejecutar():
 
                     hay_estado = False
                     if not _estado_pendiente_existe():
-                        if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados) is not None:
+                        if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados, max_hb_lineas=cfg.max_hb_acumulados) is not None:
                             email_enviado_este_ciclo = True
                             hay_estado = True
                     else:
@@ -312,7 +312,7 @@ def ejecutar():
 
             hay_estado = False
             if not _estado_pendiente_existe():
-                if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados) is not None:
+                if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados, max_hb_lineas=cfg.max_hb_acumulados) is not None:
                     email_enviado_este_ciclo = True
                     hay_estado = True
             else:

@@ -131,7 +131,7 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                     sat_nombre_detectado = sat_activo
 
             # Fallback por frecuencia si no hay match por header
-            # V8.4.2 FIX: "lora" está al nivel raíz de sat_objeto (agenda.json),
+            # "lora" está al nivel raíz de sat_objeto (agenda.json),
             # NO dentro de sat_objeto["satelite"]. Usar .get("lora") directamente.
             if sat_nombre_detectado is None and sat_objeto is not None:
                 try:
@@ -146,13 +146,13 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                                 "{} @ {:.3f}MHz (diff {:.1f}kHz)".format(
                                 sat_nombre_detectado, radio.frecuencia, diff_khz))
                     else:
-                        # V8.4.2: usar log_persistente para diagnóstico remoto en el techo
+                        # Usa log_persistente para diagnóstico remoto en el techo
                         log_persistente("ID_FALLBACK",
                             "Satelite activo {} no tiene config 'lora' valida para fallback".format(
                             sat_objeto["satelite"].get("nombre", "???")),
                             nivel="WARN")
                 except Exception as e:
-                    # V8.4.2: persistir para diagnóstico remoto
+                    # Persistir para diagnóstico remoto
                     log_persistente("ID_FALLBACK", "Error en fallback por frecuencia: {}".format(e), nivel="WARN")
 
             if sat_nombre_detectado is not None:
@@ -160,7 +160,7 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                 try:
                     frec_esperada = identificador.frecuencia_nominal(sat_nombre)
                 except Exception as e:
-                    # V8.4.2: persistir para diagnóstico remoto
+                    # Persistir para diagnóstico remoto
                     log_persistente("ID", "Error obteniendo frecuencia nominal de {}: {}".format(sat_nombre, e), nivel="WARN")
                     frec_esperada = None
                 if frec_esperada is not None:
@@ -178,7 +178,7 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                         if frec_nom is not None:
                             radio.forzar_frecuencia(frec_nom)
                     except Exception as e:
-                        # V8.4.2: persistir para diagnóstico remoto
+                        # Persistir para diagnóstico remoto
                         log_persistente("ID", "Error forzando frecuencia para {}: {}".format(sat_nombre, e), nivel="WARN")
             else:
                 sat_nombre = "DESCONOCIDO"
@@ -208,7 +208,7 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                 sweep.lock()
             os.sync()
         except Exception as e:
-            # V8.4.2: persistir el error en errores.log para diagnóstico remoto en el techo
+            # Persistir el error en errores.log para diagnóstico remoto en el techo
             log_exception("CAPTURA", e)
             import sys
             sys.print_exception(e)
@@ -230,7 +230,14 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
 # EMAIL / ESTADO
 # =========================================================================
 
-def leer_ultimos_heartbeats(max_lineas=200):
+def leer_ultimos_heartbeats(max_lineas=None):
+    # Lee las últimas líneas de heartbeat.log para incluir en el email. Si max_lineas es None, usa el valor de config.json (max_hb_acumulados)
+    if max_lineas is None:
+        try:
+            from config_system import obtener_config
+            max_lineas = int(obtener_config().get("max_hb_acumulados", 200))
+        except Exception:
+            max_lineas = 200
     try:
         with open("heartbeat.log", "r") as f:
             todas = [l.strip() for l in f.readlines() if l.strip()]
@@ -248,10 +255,11 @@ def contar_capturas_pendientes(fichero="satelites_cazados.txt"):
 
 
 def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
-                               paquetes_capturados, paquetes_descartados):
+                               paquetes_capturados, paquetes_descartados,
+                               max_hb_lineas=None):
     # Construye estado_pendiente.json. NO llama guardar_fase()
     log_debug('EMAIL', 'Preparando estado pendiente para fase4...')
-    hb_lines = leer_ultimos_heartbeats()
+    hb_lines = leer_ultimos_heartbeats(max_lineas=max_hb_lineas)
     hb_count = len(hb_lines)
     print("[EMAIL-DEBUG] === preparar_estado_pendiente() === HB={} CAP={}".format(
         hb_count, contar_capturas_pendientes()))
