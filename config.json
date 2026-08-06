@@ -10,7 +10,6 @@
   "debug_consola": true,
   "buscar_parametros": false,
   "doppler": false,
-  "email_estado_cada_minutos": 0,
   "email_estado_automatico": true,
   "email_estado_vacio": true,
   "email_estado_horas_fijas": [ "00:08", "15:30", "21:00" ],
@@ -232,22 +231,22 @@
           "crc_on": false,
           "buscar_parametros": false
         },
-        "ASTROLINE-2": {
-          "id": "64888",
-          "frec": 436365000,
-          "ancho_banda_hz": "125000",
-          "lora_sf": 8,
+        "POLYTECH-3": {
+          "id": "57191",
+          "frec": 436550000,
+          "ancho_banda_hz": "62500",
+          "lora_sf": 7,
           "lora_cr": 5,
           "implicit_header": false,
           "payload_len": 255,
           "rx_iq": false,
-          "lora_preamble_len": 12,
+          "lora_preamble_len": 8,
           "crc_on": false,
           "buscar_parametros": false
         },
-        "POLYTECH-3": {
-          "id": "57191",
-          "frec": 435050000,
+        "CSTP-1.1": {
+          "id": "57222",
+          "frec": 436074100,
           "ancho_banda_hz": "62500",
           "lora_sf": 7,
           "lora_cr": 5,

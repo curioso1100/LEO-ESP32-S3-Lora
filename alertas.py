@@ -1,5 +1,5 @@
 # =========================================================================
-# MODULO: alertas.py  V8.5.4
+# MODULO: alertas.py
 # =========================================================================
 
 import gc
@@ -83,7 +83,7 @@ def _sock_write_all(sock, data, chunk_size=256, pausa_ms=100):
             raise
 
 
-def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug_activo=False):
+def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug_activo=False, rssi_wifi=None):
     import socket
     import ssl
     from tiempo_satelites import obtener_desfase_espana
@@ -234,6 +234,9 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
             encabezado = "Reporte diario de pases {} {}\r\n".format(nombre_proyecto(), version())
             sock.write(encabezado.encode())
             sock.write(b"===========================\r\n")
+            if rssi_wifi is not None:
+                linea_rssi = "RSSI WiFi: {} dBm\r\n".format(rssi_wifi)
+                sock.write(linea_rssi.encode())
 
             fecha_agenda, pases = _cargar_agenda_segura()
             linea_fecha = "Fecha Agenda: {} (Hora Local: {})\r\n\r\n".format(fecha_agenda, hora_arranque)

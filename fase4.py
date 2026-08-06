@@ -6,6 +6,7 @@ import machine
 import time
 import os
 import gc
+import network
 
 import placa
 from placa import led_on, led_off, led_blink, reiniciar
@@ -65,9 +66,11 @@ def _fragmentar_capturas(capturas):
 def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
                              temp_cpu, ventilador_on, fs_libre_kb, errores,
                              paquetes_capturados=0, paquetes_descartados=0,
-                             horas_pendientes=None):
+                             horas_pendientes=None, rssi_wifi=None):
     partes = []
     partes.append("ESTADO DEL SISTEMA")
+    if rssi_wifi is not None:
+        partes.append("RSSI WiFi: {} dBm".format(rssi_wifi))
     partes.append("Heartbeats acumulados: {}".format(num_hb))
     if temp_cpu is not None:
         partes.append("Temperatura CPU: {:.1f}C".format(temp_cpu))
@@ -110,17 +113,18 @@ def _construir_email_capturas(trozo_capturas, num_trozo, total_trozos,
     return "\n".join(partes)
 
 
-def _enviar_email_smtp(asunto, cuerpo, debug_activo):
+def _enviar_email_smtp(asunto, cuerpo, debug_activo, rssi_wifi=None):
     import alertas
     return alertas.enviar_correo_bloques(
         asunto,
         modo_reporte=False,
         texto_telemetria=cuerpo,
-        debug_activo=debug_activo
+        debug_activo=debug_activo,
+        rssi_wifi=rssi_wifi
     )
 
 
-def enviar_email_estado(estado_pendiente):
+def enviar_email_estado(estado_pendiente, rssi_wifi=None):
     log_info("FASE4", "Enviando email de estado pendiente...")
 
     heartbeats = estado_pendiente.get("heartbeats", [])
@@ -163,7 +167,7 @@ def enviar_email_estado(estado_pendiente):
         heartbeats, num_hb, base_count, pase_count,
         temp_cpu, ventilador_on, fs_libre_kb, errores,
         paquetes_capturados, paquetes_descartados,
-        horas_pendientes)
+        horas_pendientes, rssi_wifi)
 
     del heartbeats, errores
     gc.collect()
@@ -182,7 +186,7 @@ def enviar_email_estado(estado_pendiente):
     asunto1 = "{}: Estado {} - {} CAP {} HB".format(
         nombre_proyecto(), version(), num_cap, num_hb)
 
-    exito1 = _enviar_email_smtp(asunto1, cuerpo_estado, DEBUG_MODO)
+    exito1 = _enviar_email_smtp(asunto1, cuerpo_estado, DEBUG_MODO, rssi_wifi)
     del cuerpo_estado
     gc.collect()
 
@@ -248,7 +252,7 @@ def enviar_email_estado(estado_pendiente):
             nombre_proyecto(), version(), num_trozo, total_trozos,
             linea_inicio, linea_fin, num_cap)
 
-        exito_frag = _enviar_email_smtp(asunto_frag, cuerpo_frag, DEBUG_MODO)
+        exito_frag = _enviar_email_smtp(asunto_frag, cuerpo_frag, DEBUG_MODO, rssi_wifi)
         del cuerpo_frag
         gc.collect()
 
@@ -324,6 +328,14 @@ def ejecutar():
             return
 
         wifi_conectado = conectar_wifi()
+        rssi_wifi = None
+        if wifi_conectado:
+            try:
+                wlan = network.WLAN(network.STA_IF)
+                rssi_wifi = wlan.status('rssi')
+                log_debug("FASE4", "RSSI WiFi: {} dBm".format(rssi_wifi))
+            except Exception:
+                rssi_wifi = None
         if not wifi_conectado:
             log_warn("FASE4", "Sin WiFi para enviar estado pendiente")
             apagar_wifi()
@@ -342,7 +354,7 @@ def ejecutar():
             reiniciar()
             return
 
-        exito = enviar_email_estado(estado_pendiente)
+        exito = enviar_email_estado(estado_pendiente, rssi_wifi)
 
         if exito:
             guardar_f4_fallos(0)

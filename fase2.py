@@ -43,7 +43,7 @@ def _enviar_email_itv_pendiente():
     if email_data is None:
         return True
 
-    # V8.5.4: añadir timestamp de envío para distinguir de fecha de detección
+    # añadir timestamp de envío para distinguir de fecha de detección
     try:
         from tiempo_satelites import obtener_unix_utc_real
         email_data["timestamp_envio"] = obtener_unix_utc_real()
@@ -73,6 +73,15 @@ def ejecutar():
 
     wifi_ok = conectar_wifi()
 
+    rssi_wifi = None
+    if wifi_ok:
+        try:
+            wlan = network.WLAN(network.STA_IF)
+            rssi_wifi = wlan.status('rssi')
+            log_debug("FASE2", "RSSI WiFi: {} dBm".format(rssi_wifi))
+        except Exception:
+            rssi_wifi = None
+
     try:
         if wifi_ok:
             # Imports locales para optimizar memoria (handshake SSL)
@@ -90,7 +99,8 @@ def ejecutar():
                 resultado_principal = alertas.enviar_correo_bloques(
                     "{}: Pases diarios {}".format(nombre_proyecto(), version()),
                     modo_reporte=True,
-                    debug_activo=DEBUG_MODO
+                    debug_activo=DEBUG_MODO,
+                    rssi_wifi=rssi_wifi
                 )
             except Exception as exc:
                 log_exception("FASE2", "Fallo envío reporte principal: {}".format(exc))
@@ -108,7 +118,8 @@ def ejecutar():
                                 "{}: Volcado asíncrono {}".format(nombre_proyecto(), version()),
                                 modo_reporte=False,
                                 texto_telemetria=pendientes,
-                                debug_activo=DEBUG_MODO
+                                debug_activo=DEBUG_MODO,
+                                rssi_wifi=rssi_wifi
                             )
                         except Exception as exc:
                             log_exception("FASE2", "Fallo envío volcado logs: {}".format(exc))
