@@ -122,14 +122,9 @@
                 "valor": "0x80",
                 "mask": "0xF0",
                 "descripcion": "config_flags_msb"
-              },
-              {
-                "offset": 5,
-                "valor": "0x0F",
-                "descripcion": "config_flags_lsb_trisat3"
               }
             ],
-            "longitud_minima": 6,
+            "longitud_minima": 5,
             "familia_header": "trisat"
           }
         },
@@ -233,7 +228,7 @@
         },
         "POLYTECH-3": {
           "id": "57191",
-          "frec": 436550000,
+          "frec": 435050000,
           "ancho_banda_hz": "62500",
           "lora_sf": 7,
           "lora_cr": 5,
@@ -244,11 +239,11 @@
           "crc_on": false,
           "buscar_parametros": false
         },
-        "CSTP-1.1": {
-          "id": "57222",
-          "frec": 436074100,
-          "ancho_banda_hz": "62500",
-          "lora_sf": 7,
+        "PROVES-Electra": {
+          "id": "69799",
+          "frec": 437400000,
+          "ancho_banda_hz": "125000",
+          "lora_sf": 8,
           "lora_cr": 5,
           "implicit_header": false,
           "payload_len": 255,

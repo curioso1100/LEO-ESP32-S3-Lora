@@ -39,7 +39,14 @@ def _max_errores_email_chars():
 
 def _timestamp_iso():
     try:
-        t = time.localtime()
+        # Importación diferida para evitar dependencia circular con tiempo_satelites.py
+        from tiempo_satelites import obtener_desfase_espana, _EPOCH_OFFSET
+        # time.time() en MicroPython ESP32 usa epoch 2000
+        utc_unix = int(time.time()) + _EPOCH_OFFSET
+        desfase = obtener_desfase_espana(utc_unix)
+        local_unix = utc_unix + desfase
+        # time.localtime() espera epoch 2000
+        t = time.localtime(local_unix - _EPOCH_OFFSET)
         return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}".format(
             t[0], t[1], t[2], t[3], t[4], t[5])
     except Exception:

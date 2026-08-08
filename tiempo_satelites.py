@@ -10,7 +10,7 @@ import ssl
 import gc
 import json
 
-from logger import log_info, log_debug, log_warn, log_error
+from logger import log_info, log_debug, log_warn, log_error, log_persistente
 from config_system import obtener_config
 
 
@@ -176,8 +176,23 @@ def descargar_agenda_completa(fecha_hoy):
         return False
 
     satelites_con_pases = 0
+    satelites_fallidos = []
     total_satelites = len(satelites_a_rastrear)
-    for nombre_sat, info in satelites_a_rastrear.items():
+    min_pct = int(c.get("min_satelites_porcentaje", 75))
+    # Mínimo de satélites con pases necesarios para alcanzar el umbral (redondeo hacia arriba)
+    min_satelites_necesarios = (total_satelites * min_pct + 99) // 100
+
+    for i, (nombre_sat, info) in enumerate(satelites_a_rastrear.items()):
+        # Early abort — si incluso descargando todos los satélites restantes
+        # no podemos alcanzar el umbral, paramos el bucle para ahorrar tiempo
+        satelites_restantes = total_satelites - i
+        if satelites_con_pases + satelites_restantes < min_satelites_necesarios:
+            msg_abort = "Abortando descarga temprana: imposible alcanzar umbral {}% (max posible: {}/{}, con pases: {})".format(
+                min_pct, satelites_con_pases + satelites_restantes, total_satelites, satelites_con_pases)
+            log_warn("N2YO", msg_abort)
+            log_persistente("N2YO", msg_abort, "WARN")
+            break
+
         id_norad = info["id"]
         path = (
             f"/rest/v1/satellite/radiopasses/"
@@ -224,6 +239,8 @@ def descargar_agenda_completa(fecha_hoy):
             fin_json = buffer_caracteres.rfind("}")
             if not json_detectado or fin_json == -1:
                 log_warn("N2YO", f"{nombre_sat}: respuesta sin JSON valido.")
+                log_persistente("N2YO", f"{nombre_sat}: respuesta sin JSON valido.", "WARN")
+                satelites_fallidos.append(nombre_sat)
                 continue  # pasa al siguiente satelite directamente
 
             cuerpo_json = buffer_caracteres[:fin_json + 1]
@@ -285,6 +302,8 @@ def descargar_agenda_completa(fecha_hoy):
 
         except Exception as e:
             log_error("N2YO", "{}: {}".format(nombre_sat, e))
+            log_persistente("N2YO", "{}: {}".format(nombre_sat, e), "ERROR")
+            satelites_fallidos.append(nombre_sat)
 
         finally:
             try:
@@ -302,11 +321,17 @@ def descargar_agenda_completa(fecha_hoy):
 
     if total_satelites > 0:
         porcentaje = (satelites_con_pases / total_satelites) * 100
-        min_pct = int(c.get("min_satelites_porcentaje", 75))
         if porcentaje < min_pct:
             log_error("N2YO", "Umbral no alcanzado: {}/{} satelites con pases ({:.0f}%, min {}%)".format(
                 satelites_con_pases, total_satelites, porcentaje, min_pct))
+            log_persistente("N2YO", "Umbral no alcanzado: {}/{} satelites con pases ({:.0f}%, min {}%)".format(
+                satelites_con_pases, total_satelites, porcentaje, min_pct), "ERROR")
             return False
+        elif satelites_fallidos:
+            log_warn("N2YO", "Agenda parcial: {}/{} satelites descargados ({:.0f}%). Faltaron: {}".format(
+                satelites_con_pases, total_satelites, porcentaje, ", ".join(satelites_fallidos)))
+            log_persistente("N2YO", "Agenda parcial: {}/{} satelites descargados ({:.0f}%). Faltaron: {}".format(
+                satelites_con_pases, total_satelites, porcentaje, ", ".join(satelites_fallidos)), "WARN")
 
     if len(pases_consolidados) == 0:
         log_error("N2YO", "Agenda vacia: ningun satelite tiene pases programados para hoy")

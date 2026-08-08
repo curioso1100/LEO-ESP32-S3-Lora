@@ -12,7 +12,7 @@ import os
 from placa import led_on, led_off, led_blink, reiniciar
 from red import conectar_wifi, apagar_wifi
 from config_system import guardar_fase, obtener_config, version, nombre_proyecto
-from logger import log_info, log_debug, log_warn, log_error, log_exception
+from logger import log_info, log_debug, log_warn, log_error, log_exception, log_persistente
 
 # Carga de parámetros locales
 CONFIG = obtener_config()
@@ -104,6 +104,10 @@ def ejecutar():
                 )
             except Exception as exc:
                 log_exception("FASE2", "Fallo envío reporte principal: {}".format(exc))
+                log_persistente("FASE2", "Fallo envio reporte principal: {}".format(exc), "ERROR")
+
+            if not resultado_principal:
+                log_persistente("FASE2", "Envio reporte principal retorno False (sin excepcion)", "WARN")
 
             # --- Envío 2: Volcado asíncrono de logs pendientes ---
             if ARCHIVO_LOGS in os.listdir():
@@ -123,12 +127,14 @@ def ejecutar():
                             )
                         except Exception as exc:
                             log_exception("FASE2", "Fallo envío volcado logs: {}".format(exc))
+                            log_persistente("FASE2", "Fallo envio volcado logs: {}".format(exc), "ERROR")
 
                         # Solo trunca si el envío tuvo éxito, para no perder datos
                         if resultado_logs:
                             open(ARCHIVO_LOGS, "w").close()
                         else:
                             log_warn("FASE2", "Logs conservados para reintento posterior")
+                            log_persistente("FASE2", "Envio volcado logs retorno False", "WARN")
 
                 except OSError as exc:
                     # captura específica de errores de archivo; no silenciar todo
@@ -141,6 +147,7 @@ def ejecutar():
                 _enviar_email_itv_pendiente()
             except Exception as exc:
                 log_exception("FASE2", "Fallo envío email ITV: {}".format(exc))
+                log_persistente("FASE2", "Fallo envio email ITV: {}".format(exc), "ERROR")
 
             # --- Resumen de resultados ---
             ok_principal = "OK" if resultado_principal else "FALLO"

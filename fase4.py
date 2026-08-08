@@ -12,7 +12,7 @@ import placa
 from placa import led_on, led_off, led_blink, reiniciar
 from config_system import guardar_fase, obtener_config, version, nombre_proyecto, incrementar_reinicios, leer_f4_fallos, guardar_f4_fallos
 from logger import (
-    log_info, log_debug, log_warn, log_error, log_exception,
+    log_info, log_debug, log_warn, log_error, log_exception, log_persistente,
     leer_estado_pendiente, borrar_estado_pendiente
 )
 from red import conectar_wifi, apagar_wifi, sincronizar_ntp
@@ -179,6 +179,8 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None):
     if gc.mem_free() < _MIN_RAM_ENVIO:
         log_warn("FASE4", "RAM insuficiente para Email 1 ({} < {} bytes)".format(
             gc.mem_free(), _MIN_RAM_ENVIO))
+        log_persistente("FASE4", "RAM insuficiente para Email 1 ({} < {} bytes)".format(
+            gc.mem_free(), _MIN_RAM_ENVIO), "ERROR")
         del cuerpo_estado
         gc.collect()
         return False
@@ -192,6 +194,7 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None):
 
     if not exito1:
         log_warn("FASE4", "Fallo Email 1 (Estado+HB). Se reintentara en proximo ciclo.")
+        log_persistente("FASE4", "Fallo Email 1 (Estado+HB). Se reintentara en proximo ciclo.", "ERROR")
         return False
 
     log_info("FASE4", "Email 1 (Estado+Heartbeats) enviado correctamente")
@@ -243,6 +246,8 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None):
         if gc.mem_free() < _MIN_RAM_ENVIO:
             log_warn("FASE4", "RAM insuficiente para fragmento {} ({} < {} bytes)".format(
                 num_trozo, gc.mem_free(), _MIN_RAM_ENVIO))
+            log_persistente("FASE4", "RAM insuficiente para fragmento {} ({} < {} bytes)".format(
+                num_trozo, gc.mem_free(), _MIN_RAM_ENVIO), "ERROR")
             del cuerpo_frag
             gc.collect()
             todos_enviados = False
@@ -259,6 +264,8 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None):
         if not exito_frag:
             log_warn("FASE4", "Fallo envio fragmento {}/{}. Abortando resto.".format(
                 num_trozo, total_trozos))
+            log_persistente("FASE4", "Fallo envio fragmento {}/{}. Abortando resto.".format(
+                num_trozo, total_trozos), "ERROR")
             todos_enviados = False
             break
 
@@ -281,6 +288,7 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None):
         return True
     else:
         log_warn("FASE4", "No todos los fragmentos se enviaron. Se reintentaran en proximo ciclo.")
+        log_persistente("FASE4", "No todos los fragmentos se enviaron. Se reintentaran en proximo ciclo.", "ERROR")
         return False
 
 
@@ -299,6 +307,7 @@ def ejecutar():
 
         if fallos >= 5:
             log_warn("FASE4", "Demasiados fallos consecutivos ({}), abandonando email y volviendo a fase3".format(fallos))
+            log_persistente("FASE4", "Demasiados fallos consecutivos ({}), abandonando email y volviendo a fase3".format(fallos), "ERROR")
             guardar_f4_fallos(0)
             guardar_fase(3)
             apagar_wifi()
@@ -312,6 +321,7 @@ def ejecutar():
 
         if estado_pendiente is None:
             log_warn("FASE4", "No hay estado pendiente. Volviendo a fase3.")
+            log_persistente("FASE4", "No hay estado pendiente. Volviendo a fase3.", "WARN")
             guardar_fase(3)
             apagar_wifi()
             reiniciar()
@@ -338,6 +348,7 @@ def ejecutar():
                 rssi_wifi = None
         if not wifi_conectado:
             log_warn("FASE4", "Sin WiFi para enviar estado pendiente")
+            log_persistente("FASE4", "Sin WiFi para enviar estado pendiente", "ERROR")
             apagar_wifi()
             time.sleep(60)
             incrementar_reinicios()
@@ -361,6 +372,7 @@ def ejecutar():
             guardar_fase(3)
         else:
             log_warn("FASE4", "Email fallo, reintentando mas tarde")
+            log_persistente("FASE4", "Email fallo, reintentando mas tarde", "ERROR")
             incrementar_reinicios()
             guardar_f4_fallos(fallos + 1)
 
@@ -370,6 +382,7 @@ def ejecutar():
 
     except Exception as e:
         log_error("FASE4", "Excepcion no controlada en fase4: {}".format(e))
+        log_persistente("FASE4", "Excepcion no controlada en fase4: {}".format(e), "ERROR")
         try:
             guardar_f4_fallos(fallos + 1)
         except Exception:
