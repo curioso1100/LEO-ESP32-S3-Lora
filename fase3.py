@@ -12,7 +12,7 @@ import placa
 from config_system import guardar_fase, obtener_config, leer_reinicios, incrementar_reinicios, limpiar_backups_residuales
 from logger import (
     log_info, log_debug, log_warn, log_error, log_exception,
-    rotar_logs_txt, escribir_heartbeat
+    rotar_logs_txt, escribir_heartbeat, log_persistente
 )
 from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual
 
@@ -62,6 +62,7 @@ def _intentar_transicion_fase4(radio):
         placa.reiniciar()
     except Exception as e:
         log_warn("FASE3", "Error en transicion a fase4: {}".format(e))
+        log_persistente("FASE3", "Error en transicion a fase4: {}".format(e), "WARN")
 
 
 # =========================================================================
@@ -108,10 +109,12 @@ def ejecutar():
             log_info("VENT", "Ventilador inicializado en GPIO{}".format(cfg.ventilador_gpio))
         else:
             log_warn("VENT", "No se pudo inicializar ventilador GPIO{}".format(cfg.ventilador_gpio))
+            log_persistente("VENT", "No se pudo inicializar ventilador GPIO{}".format(cfg.ventilador_gpio), "WARN")
             ventilador = None
     # NTP
     if ntp_requiere_sync():
         log_warn("RTC", "RTC corrupto - transicionando a fase1 para sincronizar")
+        log_persistente("RTC", "RTC corrupto - transicionando a fase1 para sincronizar", "WARN")
         guardar_fase(1)
         time.sleep_ms(500)
         incrementar_reinicios()
@@ -177,15 +180,14 @@ def ejecutar():
     ultimo_satelite_en_cielo = None
     thonny_info_mostrada = False
 
-    # ITV: flags para tracking de eventos por ciclo
-    heartbeat_escrito_este_ciclo = False
-    email_enviado_este_ciclo = False
 
     while True:
         # Seguridad RAM
         if gc.mem_free() < cfg.min_ram:
             log_warn("MEM", "RAM baja ({} < {} bytes), reiniciando".format(
                 gc.mem_free(), cfg.min_ram))
+            log_persistente("MEM", "RAM baja ({} < {} bytes), reiniciando".format(
+                gc.mem_free(), cfg.min_ram), "WARN")
             radio.standby()
             reinicios += 1
             incrementar_reinicios()
@@ -252,7 +254,6 @@ def ejecutar():
                     hay_estado = False
                     if not _estado_pendiente_existe():
                         if preparar_estado_pendiente(temp, vent_on, fs_libre, paquetes_capturados, paquetes_descartados, max_hb_lineas=cfg.max_hb_acumulados) is not None:
-                            email_enviado_este_ciclo = True
                             hay_estado = True
                     else:
                         log_debug("EMAIL", "Estado pendiente ya existe, saltando preparacion")
@@ -339,7 +340,6 @@ def ejecutar():
                 heartbeat_activo=cfg.heartbeat_activo
             )
 
-            heartbeat_escrito_este_ciclo = True
             if cfg.debug:
                 print("[HEARTBEAT] Guardado en heartbeat.log (IRQ:{})".format(irq_delta))
             irq_count_inicial = radio.irq_count
@@ -356,8 +356,6 @@ def ejecutar():
             rssi_satelite=None,
             sat_nombre=None,
             reinicios=reinicios,
-            heartbeat_enviado=heartbeat_escrito_este_ciclo,
-            email_enviado=email_enviado_este_ciclo,
             capturas_count=paquetes_capturados[0],
             utc_actual=utc,
             t_local_tuple=t_local
@@ -366,12 +364,11 @@ def ejecutar():
         # desde fase2 una vez al día. Aquí solo se prepara el archivo pendiente.
         itv_necesaria, motivos_itv = itv.evaluar(utc, t_local)
         if itv_necesaria:
-            log_warn("ITV", "ALERTA ITV detectada: {}. Email preparado para fase2.".format(
-                "; ".join(motivos_itv)))
+            msg_itv = "ALERTA ITV detectada: {}. Email preparado para fase2.".format(
+                "; ".join(motivos_itv))
+            log_warn("ITV", msg_itv)
+            log_persistente("ITV", msg_itv, "WARN")
 
-        # ITV: reset flags para siguiente ciclo
-        heartbeat_escrito_este_ciclo = False
-        email_enviado_este_ciclo = False
 
         # --- Sleep ---
         sleep_s = _SLEEP_PASE_ACTIVO_S if sat_obj is not None else _SLEEP_ESPERA_S

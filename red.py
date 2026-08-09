@@ -8,7 +8,7 @@ import json
 import machine
 import gc
 
-from logger import log_info, log_debug, log_warn
+from logger import log_info, log_debug, log_warn, log_persistente
 from placa import led_patron_error
 
 NTP_SERVERS = (
@@ -97,10 +97,12 @@ def conectar_wifi():
             max_intentos = int(c.get("seguridad_hardware", {}).get("max_intentos_wifi", 10))
     except Exception as e_cfg:
         log_warn("WIFI", "No se pudo leer config.json: {}".format(e_cfg))
+        log_persistente("WIFI", "No se pudo leer config.json: {}".format(e_cfg), "WARN")
         return False
 
     if not ssid:
         log_warn("WIFI", "SSID vacio. Abortando.")
+        log_persistente("WIFI", "SSID vacio. Abortando.", "WARN")
         return False
 
     log_debug("WIFI", "SSID='{}' | PASS_len={}".format(ssid, len(password)))
@@ -129,8 +131,10 @@ def conectar_wifi():
         log_info("WIFI", "Conectado (Ronda 1)! IP: {}".format(wlan.ifconfig()[0]))
         return True
 
-    log_warn("WIFI", "Ronda 1 fallo. Estado final: {}".format(
-        _ESTADOS_WIFI.get(estado_final, "DESCONOCIDO({})".format(estado_final))))
+    msg_r1 = "Ronda 1 fallo. Estado final: {}".format(
+        _ESTADOS_WIFI.get(estado_final, "DESCONOCIDO({})".format(estado_final)))
+    log_warn("WIFI", msg_r1)
+    log_persistente("WIFI", msg_r1, "WARN")
 
     # ============================================================
     # RONDA 2: solo disconnect + delay largo + reconexión suave
@@ -150,8 +154,10 @@ def conectar_wifi():
         log_info("WIFI", "Conectado (Ronda 2)! IP: {}".format(wlan.ifconfig()[0]))
         return True
 
-    log_warn("WIFI", "Ronda 2 fallo. Estado final: {}".format(
-        _ESTADOS_WIFI.get(estado_final, "DESCONOCIDO({})".format(estado_final))))
+    msg_r2 = "Ronda 2 fallo. Estado final: {}".format(
+        _ESTADOS_WIFI.get(estado_final, "DESCONOCIDO({})".format(estado_final)))
+    log_warn("WIFI", msg_r2)
+    log_persistente("WIFI", msg_r2, "WARN")
 
     # --- Apagar limpiamente antes de salir ---
     _reset_wifi_agresivo(wlan)

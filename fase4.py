@@ -24,8 +24,35 @@ DEBUG_MODO = CONFIG.get("debug_consola", True)
 
 # RAM minima para envio seguro
 _MIN_RAM_ENVIO = 22000
+
+# --- MOCK PARA PRUEBAS SIN WIFI (solo si existe mock_email.txt) ---
+_MOCK_EMAIL = False
+try:
+    with open("mock_email.txt", "r") as f:
+        _MOCK_EMAIL = True
+except OSError:
+    pass
+
+def _mock_enviar_email_smtp(asunto, cuerpo, debug_activo, rssi_wifi=None):
+    try:
+        with open("email_simulado.txt", "a") as f:
+            f.write("="*60 + "\n")
+            f.write("ASUNTO: " + str(asunto) + "\n")
+            f.write("CUERPO:\n" + str(cuerpo) + "\n")
+            f.write("="*60 + "\n\n")
+            f.flush()
+    except Exception as e:
+        log_warn("MOCK", "Error escribiendo mock: {}".format(e))
+    return True
+
+# Reemplazar _enviar_email_smtp si estamos en modo mock
+if _MOCK_EMAIL:
+    _enviar_email_smtp = _mock_enviar_email_smtp
+    log_info("MOCK", "Modo MOCK activo: emails se escriben en email_simulado.txt")
+# --- FIN MOCK ---
+
 # Tamano maximo de payload por email de capturas (chars)
-_MAX_PAYLOAD_CAPTURAS_CHARS = 8500
+_MAX_PAYLOAD_CAPTURAS_CHARS = 5000
 # Heartbeats maximo por email. 
 # Valor configurable via config.json (clave max_hb_email). Fallback 40.
 _MAX_HB_EMAIL = int(CONFIG.get("max_hb_email", 40))
@@ -42,6 +69,20 @@ def _borrar_logs_originales():
         except OSError:
             pass
 
+
+def _marcar_estado_enviado():
+    # Persiste el flag estado_enviado=True para evitar reenvio spam del estado
+    try:
+        with open("estado_pendiente.json", "r") as f:
+            ep = json.load(f)
+        ep["estado_enviado"] = True
+        with open("estado_pendiente.json", "w") as f:
+            json.dump(ep, f)
+            f.flush()
+            os.sync()
+        log_debug("FASE4", "Flag estado_enviado=True guardado")
+    except Exception as e:
+        log_warn("FASE4", "No se pudo marcar estado como enviado: {}".format(e))
 
 def _fragmentar_capturas(capturas):
     if not capturas:
@@ -156,50 +197,58 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None):
 
     horas_pendientes = obtener_horas_pendientes_estado()
 
+    # --- Flag anti-spam: evitar reenviar estado si ya se envio en ciclo anterior ---
+    estado_ya_enviado = estado_pendiente.get("estado_enviado", False)
+
     del estado_pendiente
     gc.collect()
 
     log_debug("FASE4", "RAM libre tras extraer datos: {} bytes".format(_ram_libre()))
 
-    log_info("FASE4", "Preparando Email 1: Estado + Heartbeats...")
+    if estado_ya_enviado:
+        log_info("FASE4", "Email de estado ya enviado previamente. Saltando a capturas.")
+        exito1 = True
+    else:
+        log_info("FASE4", "Preparando Email 1: Estado + Heartbeats...")
 
-    cuerpo_estado = _construir_email_estado(
-        heartbeats, num_hb, base_count, pase_count,
-        temp_cpu, ventilador_on, fs_libre_kb, errores,
-        paquetes_capturados, paquetes_descartados,
-        horas_pendientes, rssi_wifi)
+        cuerpo_estado = _construir_email_estado(
+            heartbeats, num_hb, base_count, pase_count,
+            temp_cpu, ventilador_on, fs_libre_kb, errores,
+            paquetes_capturados, paquetes_descartados,
+            horas_pendientes, rssi_wifi)
 
-    del heartbeats, errores
-    gc.collect()
+        del heartbeats, errores
+        gc.collect()
 
-    tam_estado = len(cuerpo_estado)
-    log_debug("FASE4", "Tamano Email 1 (Estado+HB): {} bytes".format(tam_estado))
-    log_debug("FASE4", "RAM libre antes de enviar Email 1: {} bytes".format(_ram_libre()))
+        tam_estado = len(cuerpo_estado)
+        log_debug("FASE4", "Tamano Email 1 (Estado+HB): {} bytes".format(tam_estado))
+        log_debug("FASE4", "RAM libre antes de enviar Email 1: {} bytes".format(_ram_libre()))
 
-    if gc.mem_free() < _MIN_RAM_ENVIO:
-        log_warn("FASE4", "RAM insuficiente para Email 1 ({} < {} bytes)".format(
-            gc.mem_free(), _MIN_RAM_ENVIO))
-        log_persistente("FASE4", "RAM insuficiente para Email 1 ({} < {} bytes)".format(
-            gc.mem_free(), _MIN_RAM_ENVIO), "ERROR")
+        if gc.mem_free() < _MIN_RAM_ENVIO:
+            log_warn("FASE4", "RAM insuficiente para Email 1 ({} < {} bytes)".format(
+                gc.mem_free(), _MIN_RAM_ENVIO))
+            log_persistente("FASE4", "RAM insuficiente para Email 1 ({} < {} bytes)".format(
+                gc.mem_free(), _MIN_RAM_ENVIO), "ERROR")
+            del cuerpo_estado
+            gc.collect()
+            return False
+
+        asunto1 = "{}: Estado {} - {} CAP {} HB".format(
+            nombre_proyecto(), version(), num_cap, num_hb)
+
+        exito1 = _enviar_email_smtp(asunto1, cuerpo_estado, DEBUG_MODO, rssi_wifi)
         del cuerpo_estado
         gc.collect()
-        return False
 
-    asunto1 = "{}: Estado {} - {} CAP {} HB".format(
-        nombre_proyecto(), version(), num_cap, num_hb)
+        if not exito1:
+            log_warn("FASE4", "Fallo Email 1 (Estado+HB). Se reintentara en proximo ciclo.")
+            log_persistente("FASE4", "Fallo Email 1 (Estado+HB). Se reintentara en proximo ciclo.", "ERROR")
+            return False
 
-    exito1 = _enviar_email_smtp(asunto1, cuerpo_estado, DEBUG_MODO, rssi_wifi)
-    del cuerpo_estado
-    gc.collect()
+        log_info("FASE4", "Email 1 (Estado+Heartbeats) enviado correctamente")
+        _marcar_estado_enviado()
 
-    if not exito1:
-        log_warn("FASE4", "Fallo Email 1 (Estado+HB). Se reintentara en proximo ciclo.")
-        log_persistente("FASE4", "Fallo Email 1 (Estado+HB). Se reintentara en proximo ciclo.", "ERROR")
-        return False
-
-    log_info("FASE4", "Email 1 (Estado+Heartbeats) enviado correctamente")
-
-    delay_seg = CONFIG.get("delay_entre_emails_seg", 30)
+    delay_seg = CONFIG.get("delay_entre_emails_seg", 60)
     if delay_seg > 0 and num_cap > 0:
         log_info("FASE4", "Esperando {}s antes de enviar capturas (anti-rate-limit)...".format(delay_seg))
         time.sleep(delay_seg)
@@ -273,7 +322,7 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None):
             num_trozo, total_trozos))
 
         if num_trozo < total_trozos:
-            time.sleep_ms(1000)
+            time.sleep_ms(3000)
             gc.collect()
 
         linea_actual = linea_fin + 1
@@ -332,35 +381,42 @@ def ejecutar():
         led_on()
 
         if time.ticks_diff(time.ticks_ms(), t_inicio_fase4) > MAX_FASE4_MS:
-            log_warn("FASE4", "WATCHDOG: excedido tiempo maximo, abortando")
+            msg_wd = "WATCHDOG: excedido tiempo maximo en fase4, abortando"
+            log_warn("FASE4", msg_wd)
+            log_persistente("FASE4", msg_wd, "ERROR")
             apagar_wifi()
             reiniciar()
             return
 
-        wifi_conectado = conectar_wifi()
         rssi_wifi = None
-        if wifi_conectado:
-            try:
-                wlan = network.WLAN(network.STA_IF)
-                rssi_wifi = wlan.status('rssi')
-                log_debug("FASE4", "RSSI WiFi: {} dBm".format(rssi_wifi))
-            except Exception:
-                rssi_wifi = None
-        if not wifi_conectado:
-            log_warn("FASE4", "Sin WiFi para enviar estado pendiente")
-            log_persistente("FASE4", "Sin WiFi para enviar estado pendiente", "ERROR")
-            apagar_wifi()
-            time.sleep(60)
-            incrementar_reinicios()
-            reiniciar()
-            return
+        if _MOCK_EMAIL:
+            log_info("MOCK", "Saltando WiFi/NTP en modo mock")
+        else:
+            wifi_conectado = conectar_wifi()
+            if wifi_conectado:
+                try:
+                    wlan = network.WLAN(network.STA_IF)
+                    rssi_wifi = wlan.status('rssi')
+                    log_debug("FASE4", "RSSI WiFi: {} dBm".format(rssi_wifi))
+                except Exception:
+                    rssi_wifi = None
+            if not wifi_conectado:
+                log_warn("FASE4", "Sin WiFi para enviar estado pendiente")
+                log_persistente("FASE4", "Sin WiFi para enviar estado pendiente", "ERROR")
+                apagar_wifi()
+                time.sleep(60)
+                incrementar_reinicios()
+                reiniciar()
+                return
 
-        ok_ntp, servidor = sincronizar_ntp()
-        if ok_ntp:
-            log_debug("NTP", "Sincronizado con {}".format(servidor))
+            ok_ntp, servidor = sincronizar_ntp()
+            if ok_ntp:
+                log_debug("NTP", "Sincronizado con {}".format(servidor))
 
         if time.ticks_diff(time.ticks_ms(), t_inicio_fase4) > MAX_FASE4_MS:
-            log_warn("FASE4", "WATCHDOG: excedido tiempo maximo antes de email, abortando")
+            msg_wd2 = "WATCHDOG: excedido tiempo maximo antes de email en fase4, abortando"
+            log_warn("FASE4", msg_wd2)
+            log_persistente("FASE4", msg_wd2, "ERROR")
             apagar_wifi()
             reiniciar()
             return

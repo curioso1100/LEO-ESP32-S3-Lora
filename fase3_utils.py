@@ -301,6 +301,7 @@ def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
             "fs_libre_kb": fs_libre_kb,
             "paquetes_capturados": paquetes_capturados[0],
             "paquetes_descartados": paquetes_descartados[0],
+            "estado_enviado": False,
             'errores': ''
         }
         estado_pendiente['errores'] = leer_errores_para_email('errores.log')

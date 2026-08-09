@@ -109,6 +109,19 @@ def formatear_fecha_utc(timestamp):
     except Exception:
         return str(timestamp)
 
+
+def formatear_fecha_local(timestamp):
+    """Convierte timestamp Unix real (epoch 1970) a hora local española (CEST/CET)."""
+    try:
+        desfase = obtener_desfase_espana(timestamp)
+        local_ts = timestamp + desfase
+        t = time.localtime(local_ts - _EPOCH_OFFSET)
+        sufijo = "CEST" if desfase == _OFFSET_VERANO_S else "CET"
+        return "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d} {}".format(
+            t[0], t[1], t[2], t[3], t[4], t[5], sufijo)
+    except Exception:
+        return str(timestamp)
+
 # =========================================================================
 # FUNCIONES DE SATÉLITES (antes en datos_satelites.py)
 # =========================================================================

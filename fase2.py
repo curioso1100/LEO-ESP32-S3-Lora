@@ -139,8 +139,10 @@ def ejecutar():
                 except OSError as exc:
                     # captura específica de errores de archivo; no silenciar todo
                     log_error("FASE2", "Error accediendo a {}: {}".format(ARCHIVO_LOGS, exc))
+                    log_persistente("FASE2", "Error accediendo a {}: {}".format(ARCHIVO_LOGS, exc), "ERROR")
                 except Exception as exc:
                     log_exception("FASE2", "Error inesperado con logs: {}".format(exc))
+                    log_persistente("FASE2", "Error inesperado con logs: {}".format(exc), "ERROR")
 
             # --- Envío 3: Email ITV (máximo una vez al día) ---
             try:

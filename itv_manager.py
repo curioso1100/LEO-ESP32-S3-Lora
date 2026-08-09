@@ -30,10 +30,8 @@
 #    - ventilador_activaciones_7d: 3+ activaciones (polvo/obstruccion)
 #    - delta_temp_maxima_c: +5C vs mes anterior (degradacion termica)
 #    - delta_rssi_db: -10dB vs historico (problema antena)
-#    - reinicios_7d: 2+ reinicios (humedad/PSU inestable)
-#    - dias_sin_capturas: 7 dias sin capturas (antena desconectada)
-#    - dias_sin_heartbeat_enviado: 3 dias sin email (fallo red/energia)
-#
+##    - dias_sin_capturas: 7 dias sin capturas (antena desconectada)
+##
 # 6. RESUMEN EN HEARTBEAT:
 #    ITV:OK 1/90 -     -> Dia 1 de 90, todo OK
 #    ITV:PENDIENTE 91/90 ITV_RUTINARIA: 91 dias -> ITV vencida
@@ -59,9 +57,7 @@ DEFAULT_UMBRALES = {
     "ventilador_activaciones_7d": 3,
     "delta_temp_maxima_c": 5,
     "delta_rssi_db": 10,
-    "reinicios_7d": 2,
     "dias_sin_capturas": 7,
-    "dias_sin_heartbeat_enviado": 3,
 }
 
 
@@ -99,20 +95,23 @@ class ITVManager:
             "ultima_itv_timestamp": 0,
             "ultima_itv_motivo": "inicial",
             "dias_acumulados": 0,
-            "heartbeats_acumulados": 0,
-            "reinicios_7d": 0,
-            "reinicios_ultima_semana": 0,
             "ventilador_activaciones_7d": 0,
             "ventilador_activaciones_historico": [],
             "temperaturas_max_semanal": [],
             "capturas_ultimos_7d": 0,
             "capturas_historico": [],
             "rssi_por_satelite": {},
-            "emails_enviados_ultimos_7d": 0,
-            "emails_enviados_historico": [],
             "ultimo_dia_calculado": 0,
             "ultimo_timestamp_diario": 0,
             "version_estado": 3,
+            "heartbeats_acumulados": 0,
+            "emails_enviados_ultimos_7d": 0,
+            "emails_enviados_historico": [],
+            "reinicios_7d": 0,
+            "reinicios_ultima_semana": 0,
+            "_temp_max_hoy": None,
+            "_capturas_previas": 0,
+            "_ventilador_estaba_on": False,
         }
 
     def _guardar_estado(self):
@@ -164,15 +163,13 @@ class ITVManager:
             import time
             dia_actual = time.localtime()[7]
 
-        hb_count = len([l for l in lineas if l.strip().startswith("HB ")])
-
         # Calcular dias_acumulados desde el primer heartbeat
         dias_estimados = self._calcular_dias_desde_primer_hb(lineas, utc_actual)
         if dias_estimados < 1:
+            hb_count = len([l for l in lineas if l.strip().startswith("HB ")])
             dias_estimados = max(1, hb_count // 96)
 
         self._estado["dias_acumulados"] = dias_estimados
-        self._estado["heartbeats_acumulados"] = hb_count
         self._estado["ultimo_dia_calculado"] = dia_actual
         self._estado["ultimo_timestamp_diario"] = utc_actual
 
@@ -185,8 +182,8 @@ class ITVManager:
             pass
 
         self._guardar_estado()
-        log_info("ITV", "Reconstruido: ~{} dias, {} HB, {} CAP (dia={})".format(
-            dias_estimados, hb_count, self._estado['capturas_ultimos_7d'], dia_actual))
+        log_info("ITV", "Reconstruido: ~{} dias, {} CAP (dia={})".format(
+            dias_estimados, self._estado['capturas_ultimos_7d'], dia_actual))
 
     def _calcular_dias_desde_primer_hb(self, lineas, utc_actual):
         # Extrae timestamp del primer heartbeat y calcula días transcurridos
@@ -211,7 +208,7 @@ class ITVManager:
     # ------------------------------------------------------------------
 
     def actualizar(self, temp_cpu, ventilador_on, rssi_satelite, sat_nombre,
-                   reinicios, heartbeat_enviado, email_enviado, capturas_count,
+                   reinicios, capturas_count,
                    utc_actual, t_local_tuple):
         dia_actual = t_local_tuple[7]
 
@@ -220,18 +217,16 @@ class ITVManager:
 
         # Reset diario: si ha pasado al menos un día real desde último reset
         if dias_transcurridos >= 1 and self._estado["ultimo_timestamp_diario"] > 0:
-            for _ in range(dias_transcurridos):
+            # LIMITAR a max 1 reset por llamada para evitar bloqueos
+            dias_a_procesar = min(dias_transcurridos, 1)
+            log_info("ITV", "Reset diario pendiente: {} dia(s) calculado(s), procesando {}".format(
+                dias_transcurridos, dias_a_procesar))
+            for _ in range(dias_a_procesar):
                 self._reset_diario(dia_actual, utc_actual)
         elif self._estado["ultimo_timestamp_diario"] == 0:
+            log_debug("ITV", "Inicializando ultimo_timestamp_diario = {}".format(utc_actual))
             self._estado['ultimo_timestamp_diario'] = utc_actual
             self._estado['ultimo_dia_calculado'] = dia_actual
-
-        if heartbeat_enviado:
-            self._estado["heartbeats_acumulados"] += 1
-
-        if email_enviado:
-            self._estado["emails_enviados_ultimos_7d"] += 1
-            self._estado["emails_enviados_historico"].append(utc_actual)
 
         if temp_cpu is not None:
             temp_hoy = self._estado.get("_temp_max_hoy", None)
@@ -256,15 +251,15 @@ class ITVManager:
 
         reinicios_prev = self._estado.get('_reinicios_previos', 0)
         if reinicios > reinicios_prev:
-            delta = reinicios - reinicios_prev
-            self._estado["reinicios_7d"] += delta
-            self._estado["reinicios_ultima_semana"] += delta
             self._estado["_reinicios_previos"] = reinicios
 
         capturas_prev = self._estado.get('_capturas_previas', 0)
-        if capturas_count > capturas_prev:
+        if capturas_count < capturas_prev:
+            # Reinicio detectado: contador reseteado
+            self._estado["capturas_ultimos_7d"] += capturas_count
+        elif capturas_count > capturas_prev:
             self._estado["capturas_ultimos_7d"] += (capturas_count - capturas_prev)
-            self._estado["_capturas_previas"] = capturas_count
+        self._estado["_capturas_previas"] = capturas_count
 
         if self._estado["heartbeats_acumulados"] % 10 == 0:
             self._guardar_estado()
@@ -275,7 +270,11 @@ class ITVManager:
         if ultimo_ts == 0:
             return 0
         segundos = utc_actual - ultimo_ts
-        return segundos // 86400
+        dias = segundos // 86400
+        if dias > 30:
+            log_warn("ITV", "dias_transcurridos anormalmente alto: {} (utc={}, ultimo_ts={})".format(
+                dias, utc_actual, ultimo_ts))
+        return dias
 
     def _reset_diario(self, dia_actual, utc_actual):
         temp_max_hoy = self._estado.pop('_temp_max_hoy', None)
@@ -293,8 +292,6 @@ class ITVManager:
 
         self._estado["capturas_ultimos_7d"] = 0
         self._estado["ventilador_activaciones_7d"] = 0
-        self._estado["reinicios_7d"] = 0
-        self._estado["emails_enviados_ultimos_7d"] = 0
         self._estado["dias_acumulados"] += 1
 
         self._limpiar_historico_antiguo(utc_actual)
@@ -307,7 +304,7 @@ class ITVManager:
 
     def _limpiar_historico_antiguo(self, utc_actual):
         limite = utc_actual - (7 * 86400)
-        for clave in ["ventilador_activaciones_historico", "emails_enviados_historico"]:
+        for clave in ["ventilador_activaciones_historico"]:
             self._estado[clave] = [e for e in self._estado[clave]
                                     if (e[0] if isinstance(e, list) else e) > limite]
 
@@ -340,8 +337,6 @@ class ITVManager:
         if rssi_alert:
             motivos.append(rssi_alert)
 
-        if self._estado["reinicios_7d"] >= self._umbrales["reinicios_7d"]:
-            motivos.append("REINICIOS: {} en 7d".format(self._estado["reinicios_7d"]))
 
         capturas_7d = self._estado["capturas_ultimos_7d"]
         if capturas_7d == 0 and dias_acum > self._umbrales["dias_sin_capturas"]:
@@ -351,9 +346,6 @@ class ITVManager:
                         motivos.append("SIN_CAPTURAS: 0 en 7d")
             except (OSError, ValueError):
                 pass
-
-        if self._estado["emails_enviados_ultimos_7d"] == 0 and dias_acum > self._umbrales["dias_sin_heartbeat_enviado"]:
-            motivos.append("SIN_COMUNICACION: 0 emails en 7d")
 
         itv_necesaria = len(motivos) > 0
         if itv_necesaria and not self._itv_pendiente:
@@ -365,6 +357,13 @@ class ITVManager:
         return itv_necesaria, motivos
 
     def _evaluar_temperatura(self):
+        # Leer reinicios totales del contador persistente del sistema
+        try:
+            from config_system import leer_reinicios
+            reinicios_totales = leer_reinicios()
+        except Exception:
+            reinicios_totales = 0
+
         temps = self._estado["temperaturas_max_semanal"]
         if len(temps) < 14:
             return None
@@ -395,6 +394,13 @@ class ITVManager:
     # ------------------------------------------------------------------
 
     def _preparar_email_itv(self, utc_actual, motivos, dias_desde_ultima_itv):
+        # Leer reinicios totales del contador persistente del sistema
+        try:
+            from config_system import leer_reinicios
+            reinicios_totales = leer_reinicios()
+        except Exception:
+            reinicios_totales = 0
+
         temps = self._estado["temperaturas_max_semanal"]
 
         # fallback a _temp_max_hoy si no hay historial semanal aun
@@ -435,15 +441,12 @@ class ITVManager:
             "motivos": motivos,
             "metricas": {
                 "dias_acumulados": self._estado["dias_acumulados"],
-                "heartbeats_acumulados": self._estado["heartbeats_acumulados"],
-                "reinicios_7d": self._estado["reinicios_7d"],
-                "reinicios_total": self._estado["reinicios_ultima_semana"],
+                "reinicios_total": reinicios_totales,
                 "ventilador_activaciones_7d": self._estado["ventilador_activaciones_7d"],
                 "temp_max_7d": temp_max_7d_str,
                 "temp_max_30d": temp_max_30d_str,
                 "capturas_total_estimado": capturas_total,
                 "capturas_7d": self._estado["capturas_ultimos_7d"],
-                "emails_7d": self._estado["emails_enviados_ultimos_7d"],
                 "rssi_por_satelite": rssi_resumen,
             },
 
@@ -515,17 +518,12 @@ class ITVManager:
         self._estado["ultima_itv_timestamp"] = utc_actual
         self._estado["ultima_itv_motivo"] = motivo
         self._estado["dias_acumulados"] = 0
-        self._estado["heartbeats_acumulados"] = 0
-        self._estado["reinicios_7d"] = 0
-        self._estado["reinicios_ultima_semana"] = 0
         self._estado["ventilador_activaciones_7d"] = 0
         self._estado["ventilador_activaciones_historico"] = []
         self._estado["temperaturas_max_semanal"] = []
         self._estado["capturas_ultimos_7d"] = 0
         self._estado["capturas_historico"] = []
         self._estado["rssi_por_satelite"] = {}
-        self._estado["emails_enviados_ultimos_7d"] = 0
-        self._estado["emails_enviados_historico"] = []
         self._estado["_reinicios_previos"] = 0
         self._estado["_capturas_previas"] = 0
         self._estado["_ventilador_estaba_on"] = False
@@ -571,9 +569,7 @@ class ITVManager:
             "dias_restantes": max(0, dias_max - dias),
             "itv_pendiente": self._itv_pendiente,
             "ventilador_7d": self._estado["ventilador_activaciones_7d"],
-            "reinicios_7d": self._estado["reinicios_7d"],
             "capturas_7d": self._estado["capturas_ultimos_7d"],
-            "emails_7d": self._estado["emails_enviados_ultimos_7d"],
             "temps_registradas": len(self._estado["temperaturas_max_semanal"]),
         }
 

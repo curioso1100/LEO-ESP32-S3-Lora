@@ -225,32 +225,6 @@
           "lora_preamble_len": 8,
           "crc_on": false,
           "buscar_parametros": false
-        },
-        "POLYTECH-3": {
-          "id": "57191",
-          "frec": 435050000,
-          "ancho_banda_hz": "62500",
-          "lora_sf": 7,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false
-        },
-        "PROVES-Electra": {
-          "id": "69799",
-          "frec": 437400000,
-          "ancho_banda_hz": "125000",
-          "lora_sf": 8,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false
         }
       }
     }
@@ -276,6 +250,6 @@
     "dias_sin_capturas": 7,
     "dias_sin_heartbeat_enviado": 3
   },
-  "delay_entre_emails_seg": 45,
+  "delay_entre_emails_seg": 60,
   "max_hb_email": 40
 }

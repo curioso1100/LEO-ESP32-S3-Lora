@@ -7,9 +7,9 @@ import json
 import time
 import os
 
-from logger import log_info, log_debug, log_warn, log_error
+from logger import log_info, log_debug, log_warn, log_error, log_persistente
 from config_system import obtener_config, version, nombre_proyecto
-from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual, formatear_fecha_utc, obtener_desfase_espana
+from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual, formatear_fecha_local, obtener_desfase_espana
 
 CONFIG = obtener_config()
 
@@ -60,6 +60,7 @@ def _cargar_agenda_segura():
         return fecha_agenda, pases
     except Exception as e_agenda:
         log_warn("SMTP", "No se pudo leer agenda.json: {}".format(e_agenda))
+        log_persistente("SMTP", "No se pudo leer agenda.json: {}".format(e_agenda), "WARN")
         return "Desconocida", []
 
 
@@ -101,6 +102,7 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
         timeout_red = int(c["seguridad_hardware"]["timeout_red_segundos"])
     except Exception as e_cfg:
         log_error("SMTP", "Fallo leyendo configuracion: {}".format(e_cfg))
+        log_persistente("SMTP", "Fallo leyendo configuracion: {}".format(e_cfg), "ERROR")
         return False
 
     try:
@@ -112,6 +114,7 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
             log_debug("SMTP", "Hora local calculada: {}".format(hora_arranque))
     except Exception as e_time:
         log_error("SMTP", "Fallo procesando hora local: {}".format(e_time))
+        log_persistente("SMTP", "Fallo procesando hora local: {}".format(e_time), "ERROR")
         return False
 
     sock = None
@@ -290,6 +293,7 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
 
     except Exception as e_flujo:
         log_error("SMTP", str(e_flujo))
+        log_persistente("SMTP", str(e_flujo), "ERROR")
         return False
 
     finally:
@@ -326,8 +330,15 @@ def construir_email_itv(email_data):
     )
 
     # Fechas
-    fecha_detectado = formatear_fecha_utc(timestamp) if timestamp else "N/A"
-    fecha_envio = formatear_fecha_utc(timestamp_envio) if timestamp_envio else "N/A"
+    fecha_detectado = formatear_fecha_local(timestamp) if timestamp else "N/A"
+    fecha_envio = formatear_fecha_local(timestamp_envio) if timestamp_envio else "N/A"
+
+    # Leer reinicios totales del sistema
+    try:
+        from config_system import leer_reinicios
+        reinicios_totales = leer_reinicios()
+    except Exception:
+        reinicios_totales = 0
 
     partes = [
         "ITV LEO {} - Revision periodica".format(version()),
@@ -344,17 +355,15 @@ def construir_email_itv(email_data):
 
     partes.extend([
         "METRICAS:",
-        "  Dias: {} | HB: {} | Reinicios: {}".format(
+        "  Dias: {} | Reinicios totales: {}".format(
             metricas.get("dias_acumulados", "N/A"),
-            metricas.get("heartbeats_acumulados", "N/A"),
-            metricas.get("reinicios_7d", "N/A")),
+            metricas.get("reinicios_total", "N/A")),
         "  Ventilador: {} activaciones (7d)".format(
             metricas.get("ventilador_activaciones_7d", "N/A")),
         "  Temp max: {}".format(metricas.get("temp_max_7d", "N/A")),
         "  Capturas: {} total | {} (7d)".format(
             metricas.get("capturas_total_estimado", "N/A"),
             metricas.get("capturas_7d", "N/A")),
-        "  Emails: {} (7d)".format(metricas.get("emails_7d", "N/A")),
         "",
     ])
 
@@ -389,8 +398,10 @@ def enviar_email_itv(email_data, debug_activo=False):
     asunto, cuerpo = construir_email_itv(email_data)
 
     if gc.mem_free() < _MIN_RAM_ENVIO_ITV:
-        log_warn("ITV_ALERT", "RAM insuficiente para email ITV ({} < {} bytes)".format(
-            gc.mem_free(), _MIN_RAM_ENVIO_ITV))
+        msg_ram = "RAM insuficiente para email ITV ({} < {} bytes)".format(
+            gc.mem_free(), _MIN_RAM_ENVIO_ITV)
+        log_warn("ITV_ALERT", msg_ram)
+        log_persistente("ITV_ALERT", msg_ram, "WARN")
         del asunto, cuerpo
         gc.collect()
         return False
@@ -422,6 +433,7 @@ def _guardar_config_con_horas_estado(horas_estado):
         return True
     else:
         log_error("ESTADO_AUTO", "Fallo actualizando config.json: {}".format(msg))
+        log_persistente("ESTADO_AUTO", "Fallo actualizando config.json: {}".format(msg), "ERROR")
         return False
 
 
