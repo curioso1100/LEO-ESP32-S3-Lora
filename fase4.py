@@ -425,6 +425,19 @@ def ejecutar():
 
         if exito:
             guardar_f4_fallos(0)
+            # === FASE 0 post-email (preparado, desactivado inicialmente) ===
+            # Descomentar las 9 lineas siguientes para activar check post-email:
+            # try:
+            #     import fase0
+            #     if fase0.ejecutar():
+            #         log_info("FASE0", "Update remoto post-email detectado. Reiniciando...")
+            #         apagar_wifi()
+            #         time.sleep(1)
+            #         reiniciar()
+            #         return
+            # except Exception as e:
+            #     log_warn("FASE0", "Error post-email: {}".format(e))
+            # === Fin FASE 0 ===            
             guardar_fase(3)
         else:
             log_warn("FASE4", "Email fallo, reintentando mas tarde")

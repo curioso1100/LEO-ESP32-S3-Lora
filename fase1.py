@@ -92,8 +92,21 @@ def ejecutar():
     log_info("FASE1", "Iniciando sincronización horaria y descarga de agenda")
 
     if conectar_wifi():
+        # === FASE 0: Check actualizacion remota (V8.9) ===
         try:
-            log_info("WIFI", "Conectado. Iniciando sincronización NTP")
+            import fase0
+            if fase0.ejecutar():
+                log_info("FASE0", "Update remoto detectado. Reiniciando para aplicar...")
+                apagar_wifi()
+                time.sleep(1)
+                reiniciar()
+                return
+        except Exception as e:
+            log_warn("FASE0", "Error en check remoto: {}".format(e))
+        # === Fin FASE 0 ===
+
+        try:
+            log_info("WIFI", "Conectado. Iniciando sincronizacion NTP")            
 
             ok_ntp, host_usado = sincronizar_ntp()
             if not ok_ntp:
