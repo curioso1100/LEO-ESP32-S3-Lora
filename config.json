@@ -12,7 +12,11 @@
   "doppler": false,
   "email_estado_automatico": true,
   "email_estado_vacio": true,
-  "email_estado_horas_fijas": [ "00:08", "15:30", "21:00" ],
+  "email_estado_horas_fijas": [
+    "00:08",
+    "15:30",
+    "21:00"
+  ],
   "heartbeat": true,
   "heartbeat_intervalo_base_min": 15,
   "heartbeat_intervalo_pase_min": 2,
@@ -173,19 +177,6 @@
             "familia_header": "trisat"
           }
         },
-        "NORBI-2": {
-          "id": "57179",
-          "frec": 436700000,
-          "ancho_banda_hz": "250000",
-          "lora_sf": 10,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false
-        },
         "MORSAT-1": {
           "id": "67274",
           "frec": 435000000,
@@ -232,19 +223,6 @@
           "ancho_banda_hz": "250000",
           "lora_sf": 10,
           "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false
-        },
-        "FOSSASAT-2E26": {
-          "id": "69899",
-          "frec": 401700000,
-          "ancho_banda_hz": "125000",
-          "lora_sf": 11,
-          "lora_cr": 8,
           "implicit_header": false,
           "payload_len": 255,
           "rx_iq": false,

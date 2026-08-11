@@ -94,13 +94,22 @@ def ejecutar():
             resultado_principal = False
             resultado_logs = False
 
+            # --- Leer logs operativos para adjuntar al reporte ---
+            texto_logs_operativos = ""
+            try:
+                from logger import leer_errores_para_email
+                texto_logs_operativos = leer_errores_para_email(max_chars=1500)
+            except Exception as e_log:
+                log_warn("FASE2", "No se pudieron leer logs operativos: {}".format(e_log))
+
             # --- Envío 1: Reporte diario de pases ---
             try:
                 resultado_principal = alertas.enviar_correo_bloques(
                     "{}: Pases diarios {}".format(nombre_proyecto(), version()),
                     modo_reporte=True,
                     debug_activo=DEBUG_MODO,
-                    rssi_wifi=rssi_wifi
+                    rssi_wifi=rssi_wifi,
+                    texto_extra=texto_logs_operativos
                 )
             except Exception as exc:
                 log_exception("FASE2", "Fallo envío reporte principal: {}".format(exc))
@@ -108,6 +117,13 @@ def ejecutar():
 
             if not resultado_principal:
                 log_persistente("FASE2", "Envio reporte principal retorno False (sin excepcion)", "WARN")
+
+            # Truncar errores.log si el reporte principal se envio correctamente
+            if resultado_principal:
+                try:
+                    open("errores.log", "w").close()
+                except OSError:
+                    pass
 
             # --- Envío 2: Volcado asíncrono de logs pendientes ---
             if ARCHIVO_LOGS in os.listdir():

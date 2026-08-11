@@ -102,7 +102,7 @@ def ejecutar():
                 reiniciar()
                 return
         except Exception as e:
-            log_warn("FASE0", "Error en check remoto: {}".format(e))
+            log_persistente("FASE0", "Error en check remoto: {}".format(e), "WARN")
         # === Fin FASE 0 ===
 
         try:

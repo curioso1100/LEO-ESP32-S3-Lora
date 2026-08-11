@@ -84,7 +84,7 @@ def _sock_write_all(sock, data, chunk_size=256, pausa_ms=100):
             raise
 
 
-def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug_activo=False, rssi_wifi=None):
+def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug_activo=False, rssi_wifi=None, texto_extra=""):
     import socket
     import ssl
     from tiempo_satelites import obtener_desfase_espana
@@ -274,6 +274,21 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
                 sock.write(linea_horas.encode())
             except Exception as e_horas:
                 log_warn("SMTP", "No se pudo incluir horas de estado: {}".format(e_horas))
+
+            # --- Añadir logs operativos al final del reporte ---
+            if texto_extra:
+                try:
+                    extra_limpio = str(texto_extra).replace("\r", " ").replace("\n", "\r\n")
+                    lineas_extra = extra_limpio.split("\r\n")
+                    for idx in range(len(lineas_extra)):
+                        if lineas_extra[idx].startswith("."):
+                            lineas_extra[idx] = ".." + lineas_extra[idx]
+                    extra_bytes = ("\r\n=== LOGS OPERATIVOS ===\r\n" + "\r\n".join(lineas_extra) + "\r\n").encode()
+                    _sock_write_all(sock, extra_bytes)
+                    del extra_bytes
+                    gc.collect()
+                except Exception as e_extra:
+                    log_warn("SMTP", "No se pudo incluir texto extra: {}".format(e_extra))
 
             del fecha_agenda, pases
             gc.collect()

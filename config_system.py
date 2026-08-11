@@ -5,26 +5,17 @@
 import json
 import os
 
-# -------------------------------------------------------------------------
-# CONSTANTES (de configuracion.py)
-# -------------------------------------------------------------------------
-
 VERSION = "V8.9"
 NOMBRE_PROYECTO = "LEO"
 
 _CONFIG_FILE = "config.json"
 _CONFIG_CACHE = None
 
-# -------------------------------------------------------------------------
-# CONFIGURACIÓN
-# -------------------------------------------------------------------------
 
 def obtener_config():
-    # Lee config.json. Si falla, devuelve diccionario vacío
     global _CONFIG_CACHE
     if _CONFIG_CACHE is not None:
         return _CONFIG_CACHE
-
     try:
         with open(_CONFIG_FILE, "r") as f:
             _CONFIG_CACHE = json.load(f)
@@ -45,15 +36,10 @@ def firma_proyecto():
     return "{} {}".format(NOMBRE_PROYECTO, VERSION)
 
 
-# -------------------------------------------------------------------------
-# ESTADO (fase)
-# -------------------------------------------------------------------------
-
 _ESTADO_FILE = "estado.json"
 
 
 def guardar_fase(fase):
-    # Guarda la fase en estado.json. Si falla, devuelve False
     try:
         with open(_ESTADO_FILE, "w") as f:
             json.dump({"fase": int(fase)}, f)
@@ -65,7 +51,6 @@ def guardar_fase(fase):
 
 
 def leer_fase():
-    # Lee la fase desde estado.json. Si falla, devuelve 1 (fase1 por defecto)
     try:
         with open(_ESTADO_FILE, "r") as f:
             estado = json.load(f)
@@ -75,22 +60,16 @@ def leer_fase():
 
 
 def borrar_estado():
-    # Elimina estado.json. Si falla, silencia el error
     try:
         os.remove(_ESTADO_FILE)
     except OSError:
         pass
 
 
-# -------------------------------------------------------------------------
-# GESTIÓN CENTRALIZADA DE BACKUP config.json
-# -------------------------------------------------------------------------
-
 _BACKUP_FILE = "config.json.bak"
 
 
 def _eliminar_backup():
-    # Elimina el fichero de backup si existe. Silencia errores
     try:
         if _BACKUP_FILE in os.listdir():
             os.remove(_BACKUP_FILE)
@@ -98,74 +77,81 @@ def _eliminar_backup():
         pass
 
 
+def _escribir_json_seguro(ruta, cfg_dict):
+    # Escribe JSON en formato plano (maxima compatibilidad MicroPython)
+    # El Gist mantiene la copia legible; la placa no necesita indentacion
+    json_str = json.dumps(cfg_dict)
+    with open(ruta, "w") as f:
+        f.write(json_str)
+        f.flush()
+        os.sync()
+
+
 def actualizar_linea_config(marcador, nueva_linea):
-    """
-    Reemplaza la primera línea que contiene 'marcador' por 'nueva_linea'.
-    Crea backup temporal, lo elimina automáticamente tras éxito.
-    En caso de fallo, restaura desde backup y luego elimina el backup.
-    NO usa logger (respeta principio arquitectónico).
-    Devuelve (exito:bool, msg:str).
-    """
-    # --- Leer original ---
+    # Reemplaza una clave en config.json via JSON parsing. Escritura ATOMICA: nunca deja config.json corrupto
+    clave = marcador.strip().strip('"').strip("'")
+    if not clave:
+        return False, "Marcador vacio"
+
+    linea = nueva_linea.strip()
+    if linea.endswith(','):
+        linea = linea[:-1]
+    idx = linea.find(':')
+    if idx < 0:
+        return False, "Formato invalido"
+    valor_str = linea[idx + 1:].strip()
+    try:
+        valor = json.loads(valor_str)
+    except ValueError as e:
+        return False, "Valor JSON invalido: {}".format(e)
+
     try:
         with open(_CONFIG_FILE, "r") as f:
-            lineas = f.readlines()
+            cfg = json.load(f)
     except Exception as e:
         return False, "Lectura config.json: {}".format(e)
 
-    # --- Buscar índice ---
-    indice = -1
-    for idx, ln in enumerate(lineas):
-        if marcador in ln:
-            indice = idx
-            break
-    if indice < 0:
-        return False, "Marcador '{}' no encontrado".format(marcador)
+    cfg[clave] = valor
 
-    # --- Crear backup (silencioso si falla) ---
-    backup_ok = False
+    temp_file = _CONFIG_FILE + ".tmp"
     try:
-        with open(_BACKUP_FILE, "w") as fb:
-            fb.write("".join(lineas))
-        backup_ok = True
-    except Exception:
-        pass
+        _escribir_json_seguro(temp_file, cfg)
+        with open(temp_file, "r") as f:
+            verif = f.read()
+        json.loads(verif)
 
-    # --- Escribir modificado ---
-    lineas[indice] = nueva_linea
-    try:
-        with open(_CONFIG_FILE, "w") as f:
-            f.write("".join(lineas))
-    except Exception as e:
-        # Restaurar si hay backup
-        if backup_ok:
+        if _CONFIG_FILE in os.listdir():
             try:
-                with open(_BACKUP_FILE, "r") as fb:
-                    restaurado = fb.read()
-                with open(_CONFIG_FILE, "w") as fo:
-                    fo.write(restaurado)
-            except Exception as e2:
-                _eliminar_backup()
-                return False, "Escritura fallo: {}. Restauracion fallo: {}".format(e, e2)
-        _eliminar_backup()
-        return False, "Escritura fallo: {}. Restaurado desde backup.".format(e)
+                os.rename(_CONFIG_FILE, _BACKUP_FILE)
+            except Exception:
+                pass
 
-    # --- Éxito: limpiar backup ---
-    _eliminar_backup()
-    return True, "OK"
+        os.rename(temp_file, _CONFIG_FILE)
+        os.sync()
+
+        if temp_file in os.listdir():
+            try:
+                os.remove(temp_file)
+            except OSError:
+                pass
+
+        global _CONFIG_CACHE
+        _CONFIG_CACHE = None
+        return True, "OK"
+    except Exception as e:
+        try:
+            if temp_file in os.listdir():
+                os.remove(temp_file)
+        except OSError:
+            pass
+        return False, "Escritura fallo: {}".format(e)
 
 
 def limpiar_backups_residuales():
-    # Elimina backups huérfanos del filesystem. Llamar una vez al inicio del sistema (ej. en fase3 antes de arrancar)
     _eliminar_backup()
 
 
-# -------------------------------------------------------------------------
-# CONTADORES PERSISTENTES (estado.json)
-# -------------------------------------------------------------------------
-
 def leer_reinicios():
-    # Lee contador de reinicios desde estado.json. Si falla, devuelve 0
     try:
         with open(_ESTADO_FILE, "r") as f:
             estado = json.load(f)
@@ -175,7 +161,6 @@ def leer_reinicios():
 
 
 def guardar_reinicios(n):
-    # Guarda contador de reinicios en estado.json. Si falla, silencia
     try:
         with open(_ESTADO_FILE, "r") as f:
             estado = json.load(f)
@@ -190,14 +175,12 @@ def guardar_reinicios(n):
 
 
 def incrementar_reinicios():
-    # Incrementa en 1 el contador de reinicios. Devuelve nuevo valor
     n = leer_reinicios() + 1
     guardar_reinicios(n)
     return n
 
 
 def leer_f4_fallos():
-    # Lee contador de fallos consecutivos de email en fase4
     try:
         with open(_ESTADO_FILE, "r") as f:
             estado = json.load(f)
@@ -207,7 +190,6 @@ def leer_f4_fallos():
 
 
 def guardar_f4_fallos(n):
-    # Guarda contador de fallos consecutivos de email en fase4
     try:
         with open(_ESTADO_FILE, "r") as f:
             estado = json.load(f)
@@ -221,33 +203,21 @@ def guardar_f4_fallos(n):
         return False
 
 
-# =========================================================================
-# CLASES AUXILIARES (fusionadas desde config_fase3.py, email_state.py,
-#                    sweep_params.py en A.3)
-# =========================================================================
-
-import time  # necesario para EstadoEmail
+import time
 
 
 class ConfigFase3:
-    # Cachea parámetros de config relevantes para fase3
-
     def __init__(self, config):
         self._raw = config
-
         self.horas_fijas = self._parsear_horas(config.get('email_estado_horas_fijas', []))
-
         self.heartbeat_base_min = int(config.get("heartbeat_intervalo_base_min", 15))
         self.heartbeat_pase_min = int(config.get("heartbeat_intervalo_pase_min", 2))
         self.heartbeat_activo = config.get("heartbeat", True)
-
         self.ventilador_activo = config.get("ventilador_activo", False)
         self.ventilador_gpio = int(config.get("ventilador_gpio", 38))
         self.ventilador_on = float(config.get("ventilador_umbral_on_c", 55.0))
         self.ventilador_off = float(config.get("ventilador_umbral_off_c", 45.0))
-
         self.doppler_activo = config.get("doppler", True)
-
         perfil_id = config.get("grupo_satelites_actual", "uhf_433")
         perfil = config.get("perfiles_satelites", {}).get(perfil_id, {})
         sweep_cfg = perfil.get("parametros_sweep", {})
@@ -259,18 +229,12 @@ class ConfigFase3:
         ])
         self.sweep_intervalo = int(sweep_cfg.get("intervalo_seg", 5))
         self.sweep_activo_global = config.get("buscar_parametros", False)
-
         self.min_ram = int(config["seguridad_hardware"]["minima_ram_alerta_bytes"])
         self.max_wifi_intentos = int(config["seguridad_hardware"]["max_intentos_wifi"])
-
         self.max_logs_txt_kb = int(config.get("max_logs_txt_kb", 50))
         self.max_logs_txt_lineas = int(config.get("max_logs_txt_lineas", 200))
-
-        # conectar max_hb_acumulados a config.json
         self.max_hb_acumulados = int(config.get("max_hb_acumulados", 200))
-        # max_hb_email para fase4 (fallback 40)
         self.max_hb_email = int(config.get("max_hb_email", 40))
-
         self.debug = config.get("debug_consola", True)
         self.perfiles = config.get("perfiles_satelites", {})
 
@@ -293,8 +257,6 @@ class ConfigFase3:
 
 
 class EstadoEmail:
-    # Solo horas fijas. Eliminado timer periodico (email_estado_cada_minutos).
-
     def __init__(self, horas_fijas_seg):
         self._horas_fijas = horas_fijas_seg
         self._ultima_hora_enviada = self._cargar_ultima_hora()
@@ -366,19 +328,16 @@ class SweepParametros:
             if (utc_unix - self._last_change) >= self._intervalo:
                 self._idx = (self._idx + 1) % len(self._combinaciones)
                 self._last_change = utc_unix
-
         if buscar and sat_objeto is not None:
             cfg = self._combinaciones[self._idx]
         else:
             cfg = {}
-
         lora = sat_objeto.get("lora", {}) if sat_objeto else {}
         cab_imp = cfg.get("implicit_header", lora.get("implicit_header", False))
         pay_len = int(lora.get("payload_len", _MAX_PAY_LEN))
         crc_on = cfg.get("crc_on", bool(lora.get("crc_on", False)))
         rx_iq = cfg.get("rx_iq", bool(lora.get("rx_iq", False)))
         sync_word = cfg.get("sync_word", int(lora.get("sync_word", 18)))
-
         return cfg, cab_imp, pay_len, crc_on, rx_iq, sync_word
 
     def lock(self):

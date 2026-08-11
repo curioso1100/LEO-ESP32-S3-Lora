@@ -39,6 +39,10 @@ def _max_errores_email_chars():
 
 def _timestamp_iso():
     try:
+        # Detectar si RTC no esta sincronizado (año < 2020 -> aun no ha pasado NTP)
+        t_raw = time.localtime()
+        if t_raw[0] < 2020:
+            return "PRE-SYNC"
         # Importación diferida para evitar dependencia circular con tiempo_satelites.py
         from tiempo_satelites import obtener_desfase_espana, _EPOCH_OFFSET
         # time.time() en MicroPython ESP32 usa epoch 2000
