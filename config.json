@@ -5,34 +5,7 @@
   "clave_aplicacion": "ptdidmptfgtifuum",
   "destinatario": "emilio.florido@gmail.com",
   "n2yo_api_key": "JBB6RW-7UAJRQ-57ED7N-5QXW",
-  "max_satelites": 50,
-  "min_satelites_porcentaje": 75,
-  "debug_consola": true,
-  "buscar_parametros": false,
-  "doppler": false,
-  "email_estado_automatico": true,
-  "email_estado_vacio": true,
-  "email_estado_horas_fijas": [
-    "00:08",
-    "15:30",
-    "21:00"
-  ],
-  "heartbeat": true,
-  "heartbeat_intervalo_base_min": 15,
-  "heartbeat_intervalo_pase_min": 2,
-  "max_logs_txt_kb": 50,
-  "max_logs_txt_lineas": 200,
-  "max_errores_email_chars": 2000,
-  "max_hb_acumulados": 200,
-  "activar_rx_diag": true,
   "ubicacion_actual": "Sevilla",
-  "ancho_banda_hz": "250000",
-  "lora_sf": 10,
-  "lora_cr": 5,
-  "lora_sync_word": 18,
-  "lora_preamble_len": 8,
-  "implicit_header": false,
-  "payload_len": 255,
   "configuracion_geografica": {
     "Sevilla": {
       "lat": "37.389",
@@ -204,19 +177,6 @@
           "buscar_parametros": false,
           "lora_sync_word": 52
         },
-        "SM-3.1": {
-          "id": "67275",
-          "frec": 435140000,
-          "ancho_banda_hz": "62500",
-          "lora_sf": 8,
-          "lora_cr": 6,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false
-        },
         "MULE-4T": {
           "id": "67286",
           "frec": 436700000,
@@ -229,10 +189,72 @@
           "lora_preamble_len": 8,
           "crc_on": false,
           "buscar_parametros": false
+        },
+        "ASTROLINE-3": {
+          "id": "64886",
+          "frec": 435865000,
+          "ancho_banda_hz": "125000",
+          "lora_sf": 8,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 12,
+          "crc_on": false,
+          "buscar_parametros": false,
+          "lora_sync_word": 18
+        },
+        "NORBY-2": {
+          "id": "57179",
+          "frec": 436650000,
+          "ancho_banda_hz": "250000",
+          "lora_sf": 10,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false,
+          "lora_sync_word": 18
+        },
+        "HUCSat": {
+          "id": "69794",
+          "frec": 437400000,
+          "ancho_banda_hz": "125000",
+          "lora_sf": 8,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false,
+          "lora_sync_word": 18
         }
       }
     }
   },
+  "ancho_banda_hz": "250000",
+  "lora_sf": 10,
+  "lora_cr": 5,
+  "lora_sync_word": 18,
+  "lora_preamble_len": 8,
+  "implicit_header": false,
+  "payload_len": 255,
+  "heartbeat": true,
+  "heartbeat_intervalo_base_min": 15,
+  "heartbeat_intervalo_pase_min": 2,
+  "max_hb_acumulados": 200,
+  "max_hb_email": 40,
+  "email_estado_automatico": true,
+  "email_estado_vacio": true,
+  "email_estado_horas_fijas": [
+    "00:08",
+    "15:30",
+    "21:00"
+  ],
+  "delay_entre_emails_seg": 60,
   "ventilador_gpio": 38,
   "ventilador_activo": true,
   "ventilador_umbral_on_c": 49,
@@ -242,18 +264,20 @@
     "max_intentos_wifi": 10,
     "minima_ram_alerta_bytes": 10000
   },
-  "depuracion_activa": true,
-  "preservar_errores_log": true,
-  "max_errores_log_kb": 100,
+  "max_logs_txt_kb": 50,
+  "max_logs_txt_lineas": 200,
+  "max_errores_email_chars": 2000,
   "itv": {
     "dias_maximos": 90,
     "ventilador_activaciones_7d": 15,
     "delta_temp_maxima_c": 5,
     "delta_rssi_db": 10,
     "reinicios_7d": 2,
-    "dias_sin_capturas": 7,
-    "dias_sin_heartbeat_enviado": 3
+    "dias_sin_capturas": 7
   },
-  "delay_entre_emails_seg": 60,
-  "max_hb_email": 40
+  "debug_consola": true,
+  "buscar_parametros": false,
+  "doppler": false,
+  "activar_rx_diag": true,
+  "min_satelites_porcentaje": 75
 }
