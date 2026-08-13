@@ -209,6 +209,7 @@
     "15:30",
     "21:00"
   ],
+  "ficheros_a_actualizar": [],
   "delay_entre_emails_seg": 60,
   "ventilador_gpio": 38,
   "ventilador_activo": true,
