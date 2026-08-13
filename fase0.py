@@ -1,5 +1,6 @@
 # =========================================================================
-# fase0.py - Actualizacion remota de configuracion desde GitHub Gist
+# fase0.py - Actualizacion remota de config.json desde GitHub Gist
+# Version minimal: sin update.flag. Descarga directa, comparacion, reinicio.
 # =========================================================================
 
 import json
@@ -11,7 +12,6 @@ import time
 
 from logger import log_warn, log_error, log_debug, log_persistente
 
-URL_UPDATE_FLAG = "https://gist.githubusercontent.com/curioso1100/748c744578208005d929a9746f301a5e/raw/update.flag"
 URL_CONFIG_JSON = "https://gist.githubusercontent.com/curioso1100/748c744578208005d929a9746f301a5e/raw/config.json"
 
 CONFIG_LOCAL = "config.json"
@@ -175,130 +175,94 @@ def _configs_iguales_normalizados(cfg_remoto_dict):
 def ejecutar():
     log_persistente("FASE0", "Iniciando check de actualizacion remota", "INFO")
 
-    status, body = _http_get(URL_UPDATE_FLAG)
-    if status != 200 or not body:
-        log_persistente("FASE0", "No hay flag disponible (status={})".format(status), "INFO")
+    status, data_bytes = _http_get(URL_CONFIG_JSON)
+    if status != 200 or not data_bytes:
+        log_persistente("FASE0", "Fallo descarga de config.json (status={})".format(status), "WARN")
         return False
 
-    flag_content = body.decode("utf-8", "ignore").strip()
-    log_persistente("FASE0", "Flag contenido: '{}'".format(flag_content), "INFO")
+    tam_remoto = len(data_bytes)
+    try:
+        tam_local = os.stat(CONFIG_LOCAL)[6]
+    except OSError:
+        tam_local = 0
 
-    if not flag_content:
-        log_persistente("FASE0", "Flag vacio. Sin actualizaciones.", "INFO")
+    log_persistente("FASE0", "config.json descargado: {} bytes (local: {} bytes)".format(tam_remoto, tam_local), "INFO")
+
+    try:
+        cfg = json.loads(data_bytes.decode("utf-8"))
+    except Exception as e:
+        log_persistente("FASE0", "JSON invalido: {}".format(e), "WARN")
         return False
 
-    ficheros_a_actualizar = [l.strip() for l in flag_content.split("\n") if l.strip()]
-    if not ficheros_a_actualizar:
-        log_persistente("FASE0", "Flag sin contenido util", "INFO")
+    if _configs_iguales_normalizados(cfg):
+        log_persistente("FASE0", "config.json remoto es identico al local tras normalizar (ignorando claves volatiles). Sin cambios.", "INFO")
         return False
 
-    cambios_aplicados = False
+    if not _validar_config(cfg):
+        log_persistente("FASE0", "Validacion rechazo el nuevo config.json", "WARN")
+        return False
 
-    for fichero in ficheros_a_actualizar:
-        log_persistente("FASE0", "Procesando actualizacion para: {}".format(fichero), "INFO")
-
-        if fichero.endswith(".py"):
-            log_warn("FASE0", "Fichero .py detectado pero no soportado aun: {}".format(fichero))
-            continue
-        if not fichero.endswith(".json"):
-            log_warn("FASE0", "Extension desconocida: {}".format(fichero))
-            continue
-
-        if fichero == "config.json":
-            url = URL_CONFIG_JSON
-        else:
-            log_warn("FASE0", "Fichero desconocido en flag: {}".format(fichero))
-            continue
-
-        status, data_bytes = _http_get(url)
-        if status != 200 or not data_bytes:
-            log_persistente("FASE0", "Fallo descarga de {} (status={})".format(fichero, status), "WARN")
-            continue
-
-        log_persistente("FASE0", "{} descargado: {} bytes".format(fichero, len(data_bytes)), "INFO")
-
-        try:
-            cfg = json.loads(data_bytes.decode("utf-8"))
-        except Exception as e:
-            log_persistente("FASE0", "JSON invalido en {}: {}".format(fichero, e), "WARN")
-            continue
-
-        if _configs_iguales_normalizados(cfg):
-            log_persistente("FASE0", "{} remoto es identico al local (ignorando claves volatiles). Sin cambios.".format(fichero), "INFO")
-            continue
-        if not _validar_config(cfg):
-            log_persistente("FASE0", "Validacion rechazo el nuevo {}".format(fichero), "WARN")
-            continue
-
-        # Escritura ATOMICA: bytes tal cual del Gist (preserva formato original)
-        # NOTA: fase1/actualizar_linea_config reescribira plano al guardar horas.
-        #       El Gist es la copia legible; la placa funciona con JSON plano.
-        temp_file = CONFIG_LOCAL + ".new"
-        try:
-            with open(temp_file, "wb") as f:
-                f.write(data_bytes)
-                f.flush()
-                os.sync()
-
-            time.sleep_ms(200)
-            with open(temp_file, "rb") as f:
-                leido = f.read()
-            if leido != data_bytes:
-                log_warn("FASE0", "Verificacion fallida: tamano esperado={}, leido={}".format(len(data_bytes), len(leido)))
-                try:
-                    os.remove(temp_file)
-                except OSError:
-                    pass
-                continue
-            try:
-                cfg_verif = json.loads(leido.decode("utf-8"))
-                if "wifi_ssid" not in cfg_verif:
-                    raise ValueError("Falta wifi_ssid")
-            except Exception as e:
-                log_warn("FASE0", "JSON post-escritura invalido: {}".format(e))
-                try:
-                    os.remove(temp_file)
-                except OSError:
-                    pass
-                continue
-
-            if CONFIG_LOCAL in os.listdir():
-                try:
-                    os.rename(CONFIG_LOCAL, CONFIG_BACKUP)
-                    log_persistente("FASE0", "Backup creado: {}".format(CONFIG_BACKUP), "INFO")
-                except Exception as e:
-                    log_warn("FASE0", "No se pudo crear backup: {}".format(e))
-
-            os.rename(temp_file, CONFIG_LOCAL)
+    # Escritura ATOMICA
+    temp_file = CONFIG_LOCAL + ".new"
+    try:
+        with open(temp_file, "wb") as f:
+            f.write(data_bytes)
+            f.flush()
             os.sync()
 
-            if temp_file in os.listdir():
-                try:
-                    os.remove(temp_file)
-                except OSError:
-                    pass
-
-            import config_system
-            config_system._CONFIG_CACHE = None
-
-            log_persistente("FASE0", "{} actualizado. Reinicio requerido.".format(fichero), "INFO")
-            cambios_aplicados = True
-
-        except Exception as e:
-            log_error("FASE0", "Error escribiendo {}: {}".format(fichero, e))
-            log_persistente("FASE0", "Error escribiendo {}: {}".format(fichero, e), "ERROR")
+        time.sleep_ms(200)
+        with open(temp_file, "rb") as f:
+            leido = f.read()
+        if leido != data_bytes:
+            log_warn("FASE0", "Verificacion fallida: tamano esperado={}, leido={}".format(len(data_bytes), len(leido)))
             try:
-                if temp_file in os.listdir():
-                    os.remove(temp_file)
+                os.remove(temp_file)
             except OSError:
                 pass
-            continue
+            return False
 
-    if cambios_aplicados:
-        log_persistente("FASE0", "Cambios aplicados. Se requiere reinicio.", "INFO")
+        try:
+            cfg_verif = json.loads(leido.decode("utf-8"))
+            if "wifi_ssid" not in cfg_verif:
+                raise ValueError("Falta wifi_ssid")
+        except Exception as e:
+            log_warn("FASE0", "JSON post-escritura invalido: {}".format(e))
+            try:
+                os.remove(temp_file)
+            except OSError:
+                pass
+            return False
+
+        if CONFIG_LOCAL in os.listdir():
+            try:
+                os.rename(CONFIG_LOCAL, CONFIG_BACKUP)
+                log_persistente("FASE0", "Backup creado: {}".format(CONFIG_BACKUP), "INFO")
+            except Exception as e:
+                log_warn("FASE0", "No se pudo crear backup: {}".format(e))
+
+        os.rename(temp_file, CONFIG_LOCAL)
+        os.sync()
+
+        if temp_file in os.listdir():
+            try:
+                os.remove(temp_file)
+            except OSError:
+                pass
+
+        import config_system
+        config_system._CONFIG_CACHE = None
+
+        log_persistente("FASE0", "config.json actualizado. Reinicio requerido.", "INFO")
         return True
-    else:
-        log_persistente("FASE0", "Sin cambios aplicados.", "INFO")
+
+    except Exception as e:
+        log_error("FASE0", "Error escribiendo config.json: {}".format(e))
+        log_persistente("FASE0", "Error escribiendo config.json: {}".format(e), "ERROR")
+        try:
+            if temp_file in os.listdir():
+                os.remove(temp_file)
+        except OSError:
+            pass
         return False
 
 
@@ -306,13 +270,6 @@ def test():
     print("=" * 60)
     print("FASE0 - MODO TEST (solo lectura, sin escritura)")
     print("=" * 60)
-    print("\n[TEST] Descargando update.flag...")
-    status, body = _http_get(URL_UPDATE_FLAG)
-    print("Status:", status)
-    if body:
-        print("Contenido:", repr(body.decode("utf-8", "ignore").strip()))
-    else:
-        print("Sin body")
     print("\n[TEST] Descargando config.json...")
     status, body = _http_get(URL_CONFIG_JSON)
     print("Status:", status)
@@ -340,3 +297,15 @@ def test():
     print("=" * 60)
     print("TEST finalizado. No se ha escrito nada en el filesystem.")
     print("=" * 60)
+
+
+if __name__ == "__main__":
+    try:
+        from red import conectar_wifi
+        if conectar_wifi():
+            res = ejecutar()
+            print("FASE0 resultado:", res)
+        else:
+            print("FASE0: No se pudo conectar WiFi")
+    except Exception as e:
+        print("FASE0: Error en ejecucion directa:", e)

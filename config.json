@@ -60,51 +60,6 @@
         ]
       },
       "satelites": {
-        "TRISAT-3": {
-          "id": "67299",
-          "frec": 436700000,
-          "ancho_banda_hz": "250000",
-          "lora_sf": 10,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false,
-          "identificacion_header": {
-            "reglas": [
-              {
-                "offset": 0,
-                "valor": "0xA5",
-                "descripcion": "header_magic"
-              },
-              {
-                "offset": 1,
-                "valor": "0x01",
-                "descripcion": "version"
-              },
-              {
-                "offset": 2,
-                "valor": "0x80",
-                "descripcion": "sat_id_msb"
-              },
-              {
-                "offset": 3,
-                "valor": "0xFF",
-                "descripcion": "sat_id_lsb"
-              },
-              {
-                "offset": 4,
-                "valor": "0x80",
-                "mask": "0xF0",
-                "descripcion": "config_flags_msb"
-              }
-            ],
-            "longitud_minima": 5,
-            "familia_header": "trisat"
-          }
-        },
         "TRISAT-4": {
           "id": "67482",
           "frec": 436700000,
@@ -190,20 +145,6 @@
           "crc_on": false,
           "buscar_parametros": false
         },
-        "ASTROLINE-3": {
-          "id": "64886",
-          "frec": 435865000,
-          "ancho_banda_hz": "125000",
-          "lora_sf": 8,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 12,
-          "crc_on": false,
-          "buscar_parametros": false,
-          "lora_sync_word": 18
-        },
         "NORBY-2": {
           "id": "57179",
           "frec": 436650000,
@@ -224,6 +165,20 @@
           "ancho_banda_hz": "125000",
           "lora_sf": 8,
           "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false,
+          "lora_sync_word": 18
+        },
+        "SM-3.1": {
+          "id": "67275",
+          "frec": 435140000,
+          "ancho_banda_hz": "62500",
+          "lora_sf": 8,
+          "lora_cr": 6,
           "implicit_header": false,
           "payload_len": 255,
           "rx_iq": false,

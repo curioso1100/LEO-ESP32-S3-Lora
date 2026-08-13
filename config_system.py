@@ -5,7 +5,7 @@
 import json
 import os
 
-VERSION = "V9.0"
+VERSION = "V8.9"
 NOMBRE_PROYECTO = "LEO"
 
 _CONFIG_FILE = "config.json"
