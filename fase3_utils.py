@@ -268,7 +268,7 @@ def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
     try:
         with open("satelites_cazados.txt", "r") as f:
             for line in f:
-                if line.strip():
+                if line.strip() and not line.strip().startswith("#"):
                     capturas.append(line.strip())
                     if len(capturas) >= 50:
                         break
@@ -276,20 +276,8 @@ def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
         pass
     gc.collect()
 
+    # V9.1: eliminado bloque # RESUMEN_RX que corrompia el fichero de capturas
     try:
-        try:
-            with open("satelites_cazados.txt", "r") as f:
-                contenido_actual = f.read()
-            resumen = "# RESUMEN_RX: capturados={} descartados={} total={}\n".format(
-                paquetes_capturados[0], paquetes_descartados[0],
-                paquetes_capturados[0] + paquetes_descartados[0])
-            with open("satelites_cazados.txt", "w") as f:
-                f.write(resumen + contenido_actual)
-                f.flush()
-                os.sync()
-        except Exception:
-            pass
-
         estado_pendiente = {
             "tipo": "estado",
             "timestamp": time.time(),

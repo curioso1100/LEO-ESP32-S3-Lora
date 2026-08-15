@@ -71,7 +71,9 @@ def obtener_tiempo_actual():
     desfase = obtener_desfase_espana(utc_unix)
     local_unix = utc_unix + desfase
     t_local = time.localtime(local_unix - _EPOCH_OFFSET)
-    reloj_pantalla_str = "{:02d}:{:02d}:{:02d}".format(t_local[3], t_local[4], t_local[5])
+    # V9.1: incluir fecha completa para eliminar ambiguedad en logs y emails
+    reloj_pantalla_str = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
+        t_local[0], t_local[1], t_local[2], t_local[3], t_local[4], t_local[5])
     return utc_unix, reloj_pantalla_str, t_local
 
 

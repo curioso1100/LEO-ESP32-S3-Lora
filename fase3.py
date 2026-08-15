@@ -169,7 +169,8 @@ def ejecutar():
         radio.bw, radio.cr, radio.sync_word, radio.crc_on, radio.rx_iq,
         radio.ganancia, gc.mem_free(), 0, 0,
         sat_hb, temp, vent_on, fs_libre,
-        heartbeat_activo=cfg.heartbeat_activo
+        heartbeat_activo=cfg.heartbeat_activo,
+            elevacion=sat_obj["satelite"]["max_elevacion"] if sat_obj else None
     )
     if cfg.debug:
         print("[HEARTBEAT] Inicial guardado (IRQ:{})".format(0))
@@ -260,6 +261,9 @@ def ejecutar():
                         hay_estado = True
 
                     if hay_estado:
+                        # V9.1: resetear contadores tras preparar estado
+                        paquetes_capturados[0] = 0
+                        paquetes_descartados[0] = 0
                         guardar_fase(4)
                         _intentar_transicion_fase4(radio)
 
@@ -321,6 +325,9 @@ def ejecutar():
                 hay_estado = True
 
             if hay_estado:
+                # V9.1: resetear contadores tras preparar estado
+                paquetes_capturados[0] = 0
+                paquetes_descartados[0] = 0
                 guardar_fase(4)
                 _intentar_transicion_fase4(radio)
 
@@ -337,7 +344,8 @@ def ejecutar():
                 radio.bw, radio.cr, radio.sync_word, radio.crc_on, radio.rx_iq,
                 radio.ganancia, gc.mem_free(), irq_delta, reinicios,
                 sat_hb, temp, vent_on, fs_libre,
-                heartbeat_activo=cfg.heartbeat_activo
+                heartbeat_activo=cfg.heartbeat_activo,
+                elevacion=sat_obj["satelite"]["max_elevacion"] if sat_obj else None
             )
 
             if cfg.debug:

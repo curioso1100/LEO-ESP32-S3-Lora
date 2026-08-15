@@ -265,7 +265,7 @@ def leer_todas_las_capturas(fichero="satelites_cazados.txt"):
     try:
         with open(fichero, "r") as h:
             lineas = h.readlines()
-        capturas = [l.strip() for l in lineas if l.strip()]
+        capturas = [l.strip() for l in lineas if l.strip() and not l.strip().startswith("#")]
         if capturas:
             log_info("CAPTURAS", "Leidas {} capturas de {}".format(len(capturas), fichero))
         return capturas
@@ -359,7 +359,8 @@ def escribir_heartbeat(path, reloj_str, modo, frecuencia_actual, sf_actual,
                        bw_actual, cr_actual, sw_actual, crc_on, rx_iq,
                        ganancia_actual, ram_libre, irq_count_total, reinicios,
                        sat_nombre=" ", temp_cpu=None, ventilador_on=False,
-                       fs_libre_kb=None, heartbeat_activo=True):
+                       fs_libre_kb=None, heartbeat_activo=True,
+                       elevacion=None):
     if not heartbeat_activo:
         return None
 
@@ -367,13 +368,14 @@ def escribir_heartbeat(path, reloj_str, modo, frecuencia_actual, sf_actual,
     vent_str = "ON" if ventilador_on else "OFF"
     fs_str = "{:.0f}".format(fs_libre_kb) if fs_libre_kb is not None else "N/A"
     rst_str = "" if reinicios == 0 else " RST={}".format(reinicios)
+    elev_str = "{:.0f}".format(elevacion) if elevacion is not None else "N/A"
 
     sat_field = "{:<15}".format(sat_nombre[:15])
 
-    linea = "HB {} {} {} {:.3f} SF{} BW{} CR{} SW{} C{} I{} RAM={} IRQ={}{} T={} V={} FS={}\n".format(
+    linea = "HB {} {} {} {:.3f} SF{} BW{} CR{} SW{} C{} I{} RAM={} IRQ={}{} E={} T={} V={} FS={}\n".format(
         reloj_str, modo, sat_field, frecuencia_actual, sf_actual, bw_actual, cr_actual, sw_actual,
         "1" if crc_on else "0", "1" if rx_iq else "0", ram_libre,
-        irq_count_total, rst_str, temp_str, vent_str, fs_str)
+        irq_count_total, rst_str, elev_str, temp_str, vent_str, fs_str)
 
     fh = None
     try:

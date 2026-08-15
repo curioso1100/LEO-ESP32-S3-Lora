@@ -6,6 +6,7 @@ import machine
 import time
 import os
 import gc
+import json
 import network
 
 import placa
@@ -16,7 +17,7 @@ from logger import (
     leer_estado_pendiente, borrar_estado_pendiente
 )
 from red import conectar_wifi, apagar_wifi, sincronizar_ntp
-from tiempo_satelites import obtener_tiempo_actual, obtener_unix_utc_real
+from tiempo_satelites import obtener_tiempo_actual, obtener_unix_utc_real, obtener_desfase_espana
 from alertas import obtener_horas_pendientes_estado
 
 CONFIG = obtener_config()
@@ -140,6 +141,26 @@ def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
     else:
         partes.append("")
         partes.append("(Sin errores/alertas relevantes en el periodo)")
+    # V9.1: bloque de metadatos estructurados para parsing externo
+    try:
+        from tiempo_satelites import obtener_tiempo_actual
+        _, ts_str, _ = obtener_tiempo_actual()
+        fecha_meta = ts_str[:10]
+        hora_meta = ts_str[11:]
+        tz_meta = "CEST" if obtener_desfase_espana(obtener_unix_utc_real()) == 7200 else "CET"
+        partes.append("")
+        partes.append("---BEGIN_META---")
+        partes.append("v={}|d={}|t={}|tz={}|wifi={}|cpu={}|fan={}|fs={}|hb={}|cap={}|drop={}|base={}|pase={}".format(
+            version(), fecha_meta, hora_meta, tz_meta,
+            rssi_wifi if rssi_wifi is not None else "N/A",
+            "{:.1f}".format(temp_cpu) if temp_cpu is not None else "N/A",
+            "1" if ventilador_on else "0",
+            "{:.0f}".format(fs_libre_kb) if fs_libre_kb is not None else "N/A",
+            num_hb, paquetes_capturados, paquetes_descartados,
+            base_count, pase_count))
+        partes.append("---END_META---")
+    except Exception:
+        pass
     return "\n".join(partes)
 
 
@@ -321,8 +342,12 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None):
         log_info("FASE4", "Fragmento {}/{} enviado correctamente".format(
             num_trozo, total_trozos))
 
+        # V9.1 FIX: rate-limit entre fragmentos, no solo 3s
         if num_trozo < total_trozos:
-            time.sleep_ms(3000)
+            frag_delay = CONFIG.get("delay_entre_emails_seg", 60)
+            if frag_delay > 0:
+                log_info("FASE4", "Esperando {}s antes del siguiente fragmento (anti-rate-limit)...".format(frag_delay))
+                time.sleep(frag_delay)
             gc.collect()
 
         linea_actual = linea_fin + 1
