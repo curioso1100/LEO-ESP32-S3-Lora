@@ -16,7 +16,7 @@ from placa import (
 
 from config_system import guardar_fase, obtener_config
 
-from logger import (log_info, log_debug, log_warn, log_error, log_exception)
+from logger import log_info, log_debug, log_warn, log_error, log_exception, log_persistente
 from red import conectar_wifi, apagar_wifi, sincronizar_ntp
 from tiempo_satelites import obtener_unix_utc_real, obtener_desfase_espana, descargar_agenda_completa
 

@@ -27,7 +27,7 @@ CLAVES_CRITICAS = [
     "perfiles_satelites",
 ]
 
-TIMEOUT_SEG = 10
+TIMEOUT_SEG = 20
 MAX_REDIRECTS = 3
 CHUNK_SIZE = 512
 
@@ -62,6 +62,9 @@ def _http_get_single(url, timeout=TIMEOUT_SEG):
     sock = None
     try:
         res = socket.getaddrinfo(host, port)
+        if not res:
+            log_persistente("FASE0", "DNS fallo para {}:{}".format(host, port), "WARN")
+            return None, None, None
         addr = res[0][4]
         raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         raw_sock.settimeout(timeout)
@@ -167,11 +170,17 @@ def _configs_iguales_normalizados(cfg_remoto_dict):
         return False
     claves_ignorar = {"email_estado_horas_fijas"}
     def _normalizar(d):
+        if not isinstance(d, dict):
+            return None
         copia = dict(d)
         for k in claves_ignorar:
             copia.pop(k, None)
         return copia
-    return _normalizar(cfg_remoto_dict) == _normalizar(cfg_local)
+    norm_remoto = _normalizar(cfg_remoto_dict)
+    norm_local = _normalizar(cfg_local)
+    if norm_remoto is None or norm_local is None:
+        return False
+    return norm_remoto == norm_local
 
 
 # =========================================================================
@@ -182,30 +191,20 @@ def _extraer_nombre_archivo(url):
     """Extrae el nombre del archivo de una URL raw de Gist.
     Ej: https://.../raw/red.py -> red.py
     """
-    # Quitar parametros de query
     url_limpia = url.split("?")[0]
-    # Quitar trailing slash
     url_limpia = url_limpia.rstrip("/")
-    # Extraer ultimo componente
     idx = url_limpia.rfind("/")
     if idx >= 0:
         nombre = url_limpia[idx + 1:]
     else:
         nombre = url_limpia
-    # Validar que termine en .py
     if not nombre.endswith(".py"):
         return None
     return nombre
 
 
-
-
 def _normalizar_url_gist(url):
-    """Corrige URLs de Gist que incluyen hash de commit, usando la URL 'latest'.
-    GitHub conserva archivos borrados si la URL incluye el hash del commit.
-    La URL 'latest' (sin hash) devuelve 404 correctamente cuando el archivo no existe.
-    NOTA: No usa 're' porque MicroPython no soporta cuantificadores {n} en regex.
-    """
+    """Corrige URLs de Gist que incluyen hash de commit, usando la URL 'latest'."""
     parts = url.split('/')
     for i, part in enumerate(parts):
         if part == 'raw' and i + 1 < len(parts):
@@ -222,6 +221,7 @@ def _normalizar_url_gist(url):
                     log_warn("FASE0", "URL con hash de commit detectada. Corregida: {} -> {}".format(url, url_corregida))
                     return url_corregida
     return url
+
 
 def _archivos_iguales(path_a, path_b):
     """Compara dos archivos byte a byte."""
@@ -248,7 +248,6 @@ def _actualizar_archivo_py(url):
         log_warn("FASE0", "Archivo protegido, omitido: {}".format(nombre))
         return False, nombre
 
-    # Normalizar URL (eliminar hash de commit si existe)
     url = _normalizar_url_gist(url)
 
     log_debug("FASE0", "Descargando {} -> {}".format(url, nombre))
@@ -297,13 +296,6 @@ def _actualizar_archivo_py(url):
         os.rename(tmp_path, nombre)
         os.sync()
 
-        # Limpiar tmp residual
-        if tmp_path in os.listdir():
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-
         log_persistente("FASE0", "{} actualizado ({} bytes).".format(nombre, len(data_bytes)), "INFO")
         return True, nombre
 
@@ -340,7 +332,7 @@ def _actualizar_modulos_py(cfg_dict):
         actualizado, nombre = _actualizar_archivo_py(url.strip())
         if actualizado:
             alguno_actualizado = True
-        time.sleep_ms(500)  # Pausa entre descargas
+        time.sleep_ms(500)
 
     return alguno_actualizado
 
@@ -353,6 +345,7 @@ def ejecutar():
     log_persistente("FASE0", "Iniciando check de actualizacion remota", "INFO")
 
     cambios = False
+    cfg = None
 
     # --- 1. Actualizar config.json (existente, sin cambios) ---
     status, data_bytes = _http_get(URL_CONFIG_JSON)
@@ -405,6 +398,8 @@ def ejecutar():
                             else:
                                 if CONFIG_LOCAL in os.listdir():
                                     try:
+                                        if CONFIG_BACKUP in os.listdir():
+                                            os.remove(CONFIG_BACKUP)
                                         os.rename(CONFIG_LOCAL, CONFIG_BACKUP)
                                         log_persistente("FASE0", "Backup creado: {}".format(CONFIG_BACKUP), "INFO")
                                     except Exception as e:
@@ -413,14 +408,11 @@ def ejecutar():
                                 os.rename(temp_file, CONFIG_LOCAL)
                                 os.sync()
 
-                                if temp_file in os.listdir():
-                                    try:
-                                        os.remove(temp_file)
-                                    except OSError:
-                                        pass
-
-                                import config_system
-                                config_system._CONFIG_CACHE = None
+                                try:
+                                    import config_system
+                                    config_system._CONFIG_CACHE = None
+                                except Exception as e:
+                                    log_warn("FASE0", "No se pudo invalidar cache de config_system: {}".format(e))
 
                                 log_persistente("FASE0", "config.json actualizado. Reinicio requerido.", "INFO")
                                 cambios = True
@@ -463,7 +455,6 @@ def test():
             sats = list(cfg.get("perfiles_satelites", {}).get(grupo, {}).get("satelites", {}).keys())
             print("Satelites en perfil '{}': {}".format(grupo, sats))
             print("Validacion estructural:", "OK" if _validar_config(cfg) else "FALLIDA")
-            # Test de ficheros_a_actualizar
             urls = cfg.get("ficheros_a_actualizar", [])
             print("ficheros_a_actualizar:", urls)
             for url in urls:
