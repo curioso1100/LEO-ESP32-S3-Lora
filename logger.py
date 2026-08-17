@@ -8,13 +8,11 @@ import time
 
 from config_system import obtener_config
 
-
 def _debug_activo():
     try:
         return obtener_config().get("debug_consola", True)
     except:
         return True
-
 
 def _max_log_lineas():
     try:
@@ -22,20 +20,17 @@ def _max_log_lineas():
     except:
         return 50
 
-
 def _rx_diag_activo():
     try:
         return obtener_config().get("activar_rx_diag", True)
     except:
         return True
 
-
 def _max_errores_email_chars():
     try:
         return int(obtener_config().get("max_errores_email_chars", 2000))
     except:
         return 2000
-
 
 def _timestamp_iso():
     try:
@@ -56,28 +51,22 @@ def _timestamp_iso():
     except Exception:
         return "????-??-??T??:??:??"
 
-
 def log_info(modulo, mensaje):
     if _debug_activo():
         print("[INFO][{}] {}".format(modulo, mensaje))
-
 
 def log_debug(modulo, mensaje):
     if _debug_activo():
         print("[DEBUG][{}] {}".format(modulo, mensaje))
 
-
 def log_warn(modulo, mensaje):
     print("[WARN][{}] {}".format(modulo, mensaje))
-
 
 def log_error(modulo, mensaje):
     print("[ERROR][{}] {}".format(modulo, mensaje))
 
-
 def log_exception(modulo, exc):
     print("[ERROR][{}] {}".format(modulo, str(exc)))
-
 
 def _contar_lineas_fichero(fichero):
     try:
@@ -88,7 +77,6 @@ def _contar_lineas_fichero(fichero):
             return count
     except OSError:
         return 0
-
 
 def _rotar_si_necesario(fichero, max_lineas):
     try:
@@ -106,7 +94,6 @@ def _rotar_si_necesario(fichero, max_lineas):
         pass
     return False
 
-
 def log_persistente(modulo, mensaje, nivel="ERROR", fichero="errores.log"):
     ts = _timestamp_iso()
     linea = "{}|{}|{}|{}\n".format(ts, modulo, nivel, mensaje)
@@ -123,7 +110,6 @@ def log_persistente(modulo, mensaje, nivel="ERROR", fichero="errores.log"):
     except Exception:
         pass
 
-
 def log_rx_diag(irq, estado, longitud, datos=None):
     if not _rx_diag_activo():
         return
@@ -132,7 +118,6 @@ def log_rx_diag(irq, estado, longitud, datos=None):
     if datos is not None:
         msg += " DATA={}".format(datos[:32] if len(datos) > 32 else datos)
     log_persistente("RX", msg, nivel="INFO")
-
 
 def rotar_logs_txt(max_kb, max_lineas, fichero="logs.txt"):
     try:
@@ -162,7 +147,6 @@ def rotar_logs_txt(max_kb, max_lineas, fichero="logs.txt"):
     except Exception as e:
         log_warn("LOGS", "Error rotando {}: {}".format(fichero, e))
 
-
 def leer_archivo_texto(path, max_lineas=500):
     try:
         with open(path, "r") as f:
@@ -174,7 +158,6 @@ def leer_archivo_texto(path, max_lineas=500):
         return "({} no disponible)".format(path)
     except Exception as e:
         return "(Error leyendo {}: {})".format(path, e)
-
 
 def leer_errores_para_email(fichero="errores.log", max_chars=None):
     if max_chars is None:
@@ -232,7 +215,6 @@ def leer_errores_para_email(fichero="errores.log", max_chars=None):
     except Exception as e:
         return "(Error leyendo {}: {})".format(fichero, e)
 
-
 def escribir_captura(path, sat_nombre, marca_tiempo, frecuencia_actual,
                      sf_actual, bw_actual, cr_actual, sw_actual,
                      rx_iq, crc_on, implicit_header, pay_len,
@@ -260,7 +242,6 @@ def escribir_captura(path, sat_nombre, marca_tiempo, frecuencia_actual,
         if fh:
             fh.close()
 
-
 def leer_todas_las_capturas(fichero="satelites_cazados.txt"):
     try:
         with open(fichero, "r") as h:
@@ -276,7 +257,6 @@ def leer_todas_las_capturas(fichero="satelites_cazados.txt"):
         log_warn("CAPTURAS", "Error leyendo {}: {}".format(fichero, e))
         return []
 
-
 def borrar_capturas(fichero="satelites_cazados.txt"):
     try:
         os.remove(fichero)
@@ -288,14 +268,12 @@ def borrar_capturas(fichero="satelites_cazados.txt"):
         log_warn("CAPTURAS", "No se pudo eliminar {}: {}".format(fichero, e))
         return False
 
-
 def hay_capturas_pendientes(fichero="satelites_cazados.txt"):
     try:
         with open(fichero, "r") as f:
             return len(f.readlines()) > 0
     except OSError:
         return False
-
 
 def leer_logs_pendientes(fichero="logs.txt"):
     try:
@@ -306,7 +284,6 @@ def leer_logs_pendientes(fichero="logs.txt"):
     except Exception as e:
         log_warn("LOG", "Error leyendo {}: {}".format(fichero, e))
         return []
-
 
 def guardar_logs(logs, fichero="logs.txt"):
     if not logs:
@@ -321,7 +298,6 @@ def guardar_logs(logs, fichero="logs.txt"):
     except Exception as e:
         log_error("LOG", "Error escribiendo {}: {}".format(fichero, e))
         return False
-
 
 def guardar_para_reintento(resumen, capturas, fichero="logs.txt"):
     try:
@@ -338,7 +314,6 @@ def guardar_para_reintento(resumen, capturas, fichero="logs.txt"):
     except Exception as e:
         log_error("EMAIL", "No se pudieron guardar datos para reintento: {}".format(e))
 
-
 def leer_estado_pendiente(fichero="estado_pendiente.json"):
     try:
         with open(fichero, "r") as f:
@@ -346,14 +321,12 @@ def leer_estado_pendiente(fichero="estado_pendiente.json"):
     except (OSError, ValueError):
         return None
 
-
 def borrar_estado_pendiente(fichero="estado_pendiente.json"):
     try:
         os.remove(fichero)
         log_info("ESTADO", "{} eliminado".format(fichero))
     except OSError:
         pass
-
 
 def escribir_heartbeat(path, reloj_str, modo, frecuencia_actual, sf_actual,
                        bw_actual, cr_actual, sw_actual, crc_on, rx_iq,

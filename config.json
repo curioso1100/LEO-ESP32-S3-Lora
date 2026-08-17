@@ -116,7 +116,33 @@
           "rx_iq": false,
           "lora_preamble_len": 10,
           "crc_on": false,
-          "buscar_parametros": false
+          "buscar_parametros": false,
+          "identificacion_header": {
+            "reglas": [
+              {
+                "offset": 0,
+                "valor": "0x41",
+                "descripcion": "header_magic"
+              },
+              {
+                "offset": 1,
+                "valor": "0xA9",
+                "descripcion": "version"
+              },
+              {
+                "offset": 2,
+                "valor": "0x01",
+                "descripcion": "sat_id_msb"
+              },
+              {
+                "offset": 3,
+                "valor": "0x00",
+                "descripcion": "sat_id_lsb"
+              }
+            ],
+            "longitud_minima": 4,
+            "familia_header": "morsat"
+          }
         },
         "KOSAR-1.5": {
           "id": "67264",
@@ -185,7 +211,33 @@
           "lora_preamble_len": 8,
           "crc_on": false,
           "buscar_parametros": false,
-          "lora_sync_word": 18
+          "lora_sync_word": 18,
+          "identificacion_header": {
+            "reglas": [
+              {
+                "offset": 0,
+                "valor": "0x00",
+                "descripcion": "header_0"
+              },
+              {
+                "offset": 1,
+                "valor": "0x02",
+                "descripcion": "header_1"
+              },
+              {
+                "offset": 2,
+                "valor": "0x7E",
+                "descripcion": "header_2"
+              },
+              {
+                "offset": 3,
+                "valor": "0xC0",
+                "descripcion": "header_3"
+              }
+            ],
+            "longitud_minima": 4,
+            "familia_header": "sm3"
+          }
         }
       }
     }

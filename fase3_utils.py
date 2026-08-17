@@ -13,11 +13,7 @@ from logger import (
 )
 from tiempo_satelites import obtener_tiempo_actual
 
-
-# =========================================================================
 # AGENDA
-# =========================================================================
-
 def agenda_caducada(t_local):
     # Devuelve True si la agenda no corresponde al dia actual
     try:
@@ -32,7 +28,6 @@ def agenda_caducada(t_local):
     except Exception as e:
         log_exception("AGENDA", e)
         return False
-
 
 def mostrar_proximos_pases(utc_actual, reloj_str):
     try:
@@ -74,7 +69,6 @@ def mostrar_proximos_pases(utc_actual, reloj_str):
         print("  #{} {}-{} {:12} (Elev:{}°){}".format(i+1, ini, fin, nom, el, marca))
     print("")
 
-
 def mostrar_estado_pase(sat_objeto, params, sweep_cfg, doppler_activo):
     if sat_objeto is None:
         return
@@ -93,23 +87,11 @@ def mostrar_estado_pase(sat_objeto, params, sweep_cfg, doppler_activo):
         duracion_total, transcurrido, tramo_txt,
         "ON" if doppler_activo else "OFF"))
 
-
-# =========================================================================
 # RECEPCIÓN
-# =========================================================================
-
 def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                         paquetes_capturados, paquetes_descartados, debug=False):
     datos_raw, estado_rx, rssi, snr = radio.leer_paquete()
 
-    # ================================================================
-    # V8.3 FIX: aceptar cualquier paquete con datos durante pase activo.
-    # Los satélites CubeSat generan frecuentemente HEADER_ERR o estados
-    # intermedios, pero los datos son válidos. El fallback de frecuencia
-    # y el identificador por header se encargan del resto.
-    # En modo BASE se mantiene el filtro estricto (estado 0 o -7) para
-    # no llenar de basura.
-    # ================================================================
     paquete_valido = (
         datos_raw is not None and
         len(datos_raw) > 0 and
@@ -131,8 +113,6 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                     sat_nombre_detectado = sat_activo
 
             # Fallback por frecuencia si no hay match por header
-            # "lora" está al nivel raíz de sat_objeto (agenda.json),
-            # NO dentro de sat_objeto["satelite"]. Usar .get("lora") directamente.
             if sat_nombre_detectado is None and sat_objeto is not None:
                 try:
                     lora_cfg = sat_objeto.get("lora")
@@ -184,7 +164,7 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
                 sat_nombre = "DESCONOCIDO"
 
             buscar_activo = sweep._debe_buscar(sat_objeto)
-            modo = "BUSQUEDA" if buscar_activo else "NORMAL"
+            modo = "BQ" if buscar_activo else "N"
             estado_rx_str = "OK" if estado_rx == 0 else ("CRC_ERR" if estado_rx == -7 else str(estado_rx))
 
             escribir_captura("satelites_cazados.txt", sat_nombre, reloj_pantalla_str,
@@ -225,11 +205,7 @@ def procesar_recepcion(radio, sat_objeto, sweep, identificador,
     gc.collect()
     return sweep.locked
 
-
-# =========================================================================
 # EMAIL / ESTADO
-# =========================================================================
-
 def leer_ultimos_heartbeats(max_lineas=None):
     # Lee las últimas líneas de heartbeat.log para incluir en el email. Si max_lineas es None, usa el valor de config.json (max_hb_acumulados)
     if max_lineas is None:
@@ -245,14 +221,12 @@ def leer_ultimos_heartbeats(max_lineas=None):
     except OSError:
         return []
 
-
 def contar_capturas_pendientes(fichero="satelites_cazados.txt"):
     try:
         with open(fichero, "r") as f:
             return len([l for l in f.readlines() if l.strip()])
     except:
         return 0
-
 
 def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
                                paquetes_capturados, paquetes_descartados,
@@ -276,7 +250,6 @@ def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
         pass
     gc.collect()
 
-    # V9.1: eliminado bloque # RESUMEN_RX que corrompia el fichero de capturas
     try:
         estado_pendiente = {
             "tipo": "estado",
@@ -312,14 +285,11 @@ def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
         log_exception("EMAIL_ESTADO", e)
         return None
 
-
-# =========================================================================
 # NTP
-# =========================================================================
-
 def ntp_requiere_sync():
     # Devuelve True si el RTC indica ano < 2026 (corrupto)
     if time.localtime()[0] >= 2026:
         return False
     log_warn("RTC", "RTC corrupto - se requiere sincronizacion NTP")
     return False
+  
