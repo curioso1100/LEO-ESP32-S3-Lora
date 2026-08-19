@@ -29,6 +29,7 @@ CLAVES_CRITICAS = [
 TIMEOUT_SEG = 20
 MAX_REDIRECTS = 3
 CHUNK_SIZE = 256          # Reducido para no reservar buffers grandes
+DELAY_ENTRE_DESCARGAS_MS = 3000   # 3 s entre descargas para no saturar GitHub
 
 
 def _parsear_url(url):
@@ -234,6 +235,7 @@ def _http_download(url, filepath, timeout=TIMEOUT_SEG):
         status, bytes_written, redirect = _http_download_single(current_url, filepath, timeout)
         if status in (301, 302, 307, 308) and redirect:
             log_debug("FASE0", "Redirect {} -> {}".format(status, redirect))
+            time.sleep(1)   # Pausa tras redirect para no saturar GitHub
             # El redirect puede ya tener query params
             if "?" in redirect:
                 current_url = redirect + "&t=" + str(int(time.time()))
@@ -450,7 +452,7 @@ def _actualizar_modulos_py(cfg_dict):
         actualizado, nombre = _actualizar_archivo_py(url.strip())
         if actualizado:
             alguno_actualizado = True
-        time.sleep_ms(500)
+        time.sleep_ms(DELAY_ENTRE_DESCARGAS_MS)
 
     return alguno_actualizado
 
@@ -552,6 +554,7 @@ def ejecutar():
 
     # --- 2. Actualizar modulos .py ---
     if cfg is not None:
+        time.sleep(2)   # Pausa entre fases para no saturar GitHub
         if _actualizar_modulos_py(cfg):
             cambios = True
 

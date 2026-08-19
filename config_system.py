@@ -41,8 +41,14 @@ _ESTADO_FILE = "estado.json"
 
 def guardar_fase(fase):
     try:
+        with open(_ESTADO_FILE, "r") as f:
+            estado = json.load(f)
+    except (OSError, ValueError):
+        estado = {}
+    estado["fase"] = int(fase)
+    try:
         with open(_ESTADO_FILE, "w") as f:
-            json.dump({"fase": int(fase)}, f)
+            json.dump(estado, f)
             f.flush()
             os.sync()
         return True
@@ -54,7 +60,7 @@ def leer_fase():
     try:
         with open(_ESTADO_FILE, "r") as f:
             estado = json.load(f)
-            return int(estado.get("fase", 1))
+        return int(estado.get("fase", 1))
     except (OSError, ValueError):
         return 1
 
@@ -164,7 +170,10 @@ def guardar_reinicios(n):
     try:
         with open(_ESTADO_FILE, "r") as f:
             estado = json.load(f)
-        estado["reinicios"] = int(n)
+    except (OSError, ValueError):
+        estado = {}
+    estado["reinicios"] = int(n)
+    try:
         with open(_ESTADO_FILE, "w") as f:
             json.dump(estado, f)
             f.flush()
@@ -180,6 +189,11 @@ def incrementar_reinicios():
     return n
 
 
+def resetear_reinicios():
+    """Resetea contador de reinicios a 0. Usar tras ITV o mantenimiento."""
+    return guardar_reinicios(0)
+
+
 def leer_f4_fallos():
     try:
         with open(_ESTADO_FILE, "r") as f:
@@ -193,7 +207,10 @@ def guardar_f4_fallos(n):
     try:
         with open(_ESTADO_FILE, "r") as f:
             estado = json.load(f)
-        estado["f4_fallos_email"] = int(n)
+    except (OSError, ValueError):
+        estado = {}
+    estado["f4_fallos_email"] = int(n)
+    try:
         with open(_ESTADO_FILE, "w") as f:
             json.dump(estado, f)
             f.flush()

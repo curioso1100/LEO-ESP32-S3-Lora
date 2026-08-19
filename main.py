@@ -1,6 +1,13 @@
 # =========================================================================
 # SCRIPT PRINCIPAL: main.py (Versión Modularizada)
 # =========================================================================
+
+try:
+    from config_system import incrementar_reinicios
+    incrementar_reinicios()
+except Exception:
+    pass  # Si config_system falla, continuar igual
+
 from config_system import leer_fase
 
 # Leer la fase activa al arrancar el microcontrolador

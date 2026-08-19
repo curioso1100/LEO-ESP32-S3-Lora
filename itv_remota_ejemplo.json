@@ -1,0 +1,12 @@
+Emilio (17/8/2026)
+
+Este fichero sirve para realizar la ITV de forma remota. Debería renombrarse a itv_remota.json y subirlo a Gits. En teoría, en el próximo arranque
+la placa lo descargaría y daría por realizada la ITV. No lo he probado nunca y no sé si funcionará :-)
+
+
+{
+    "realizar_itv": true,
+    "timestamp": 0,
+    "motivo": "remota_post_reinicio",
+    "notas": "Actualizacion config.json - reinicio planificado, todo OK"
+}

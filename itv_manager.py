@@ -21,18 +21,29 @@
 #    >>> itv.marcar_itv_realizada(obtener_unix_utc_real(), "revision_ok")
 #    # O en fase3: pulsa PRG 1 vez
 #
-# 4. FICHEROS ITV EN FLASH:
+# 4. ITV REMOTA (sin bajar la placa):
+#    Crea itv_remota.json en la flash (via Git o Thonny):
+#    {
+#        "realizar_itv": true,
+#        "timestamp": 1234567890,
+#        "motivo": "remota_post_reinicio",
+#        "notas": "Actualizacion config.json - todo OK"
+#    }
+#    La placa lo procesara automaticamente al crear ITVManager.
+#
+# 5. FICHEROS ITV EN FLASH:
 #    - itv_estado.json          : Metricas acumuladas (NO borrar)
 #    - itv_email_pendiente.json : Email ITV preparado (se borra tras envio)
+#    - itv_remota.json          : Orden de ITV remota (se borra tras procesar)
 #
-# 5. CRITERIOS ITV (configurables en config.json -> "itv"):
+# 6. CRITERIOS ITV (configurables en config.json -> "itv"):
 #    - dias_maximos: 90 dias sin revision
 #    - ventilador_activaciones_7d: 3+ activaciones (polvo/obstruccion)
 #    - delta_temp_maxima_c: +5C vs mes anterior (degradacion termica)
 #    - delta_rssi_db: -10dB vs historico (problema antena)
-##    - dias_sin_capturas: 7 dias sin capturas (antena desconectada)
-##
-# 6. RESUMEN EN HEARTBEAT:
+#    - dias_sin_capturas: 7 dias sin capturas (antena desconectada)
+#
+# 7. RESUMEN EN HEARTBEAT:
 #    ITV:OK 1/90 -     -> Dia 1 de 90, todo OK
 #    ITV:PENDIENTE 91/90 ITV_RUTINARIA: 91 dias -> ITV vencida
 #
@@ -51,6 +62,7 @@ from logger import log_info, log_warn, log_debug, log_persistente
 
 ITV_FICHERO = "itv_estado.json"
 ITV_EMAIL_FICHERO = "itv_email_pendiente.json"
+ITV_REMOTA_FICHERO = "itv_remota.json"
 
 DEFAULT_UMBRALES = {
     "dias_maximos": 90,
@@ -71,9 +83,11 @@ class ITVManager:
         self._cfg = config or {}
         self._umbrales = self._cargar_umbrales()
         self._estado = self._cargar_estado()
-        self._itv_pendiente = False
-        self._motivo_itv = []
+        # FIX: cargar flags de persistencia para que sobrevivan a reinicios
+        self._itv_pendiente = self._estado.get("itv_pendiente", False)
+        self._motivo_itv = self._estado.get("motivo_itv", [])
         self._inicializar_metricas()
+        self._procesar_itv_remota()
 
     # ------------------------------------------------------------------
     # Carga / persistencia
@@ -112,9 +126,15 @@ class ITVManager:
             "_temp_max_hoy": None,
             "_capturas_previas": 0,
             "_ventilador_estaba_on": False,
+            # FIX: persistir flags de alerta entre reinicios
+            "itv_pendiente": False,
+            "motivo_itv": [],
         }
 
     def _guardar_estado(self):
+        # FIX: sincronizar flags de instancia al estado antes de guardar
+        self._estado["itv_pendiente"] = self._itv_pendiente
+        self._estado["motivo_itv"] = self._motivo_itv
         try:
             with open(ITV_FICHERO, "w") as f:
                 json.dump(self._estado, f)
@@ -122,6 +142,38 @@ class ITVManager:
                 os.sync()
         except Exception as e:
             log_warn("ITV", "No se pudo guardar estado: {}".format(e))
+
+    # ------------------------------------------------------------------
+    # ITV remota (sin bajar la placa)
+    # ------------------------------------------------------------------
+
+    def _procesar_itv_remota(self):
+        """Procesa itv_remota.json si existe. Permite marcar ITV realizada
+        remotamente subiendo un archivo via Git sin bajar la placa."""
+        try:
+            if ITV_REMOTA_FICHERO not in os.listdir():
+                return
+            with open(ITV_REMOTA_FICHERO, "r") as f:
+                data = json.load(f)
+            if not data.get("realizar_itv", False):
+                return
+            timestamp = data.get("timestamp", 0)
+            motivo = data.get("motivo", "remota")
+            notas = data.get("notas", "")
+            if timestamp == 0:
+                try:
+                    from tiempo_satelites import obtener_unix_utc_real
+                    timestamp = obtener_unix_utc_real()
+                except Exception:
+                    timestamp = int(time.time())
+            self.marcar_itv_realizada(timestamp, motivo)
+            try:
+                os.remove(ITV_REMOTA_FICHERO)
+            except OSError:
+                pass
+            log_info("ITV", "ITV remota procesada: {} | {}".format(motivo, notas))
+        except (OSError, ValueError) as e:
+            log_debug("ITV", "Error procesando ITV remota: {}".format(e))
 
     # ------------------------------------------------------------------
     # Inicialización de métricas desde logs existentes
@@ -215,14 +267,17 @@ class ITVManager:
         # Calcular días transcurridos desde último timestamp diario
         dias_transcurridos = self._calcular_dias_transcurridos(utc_actual)
 
-        # Reset diario: si ha pasado al menos un día real desde último reset
+        # FIX: procesar TODOS los días pendientes, no solo 1.
+        # Si la placa estuvo apagada varios días, hace falta ejecutar
+        # el reset diario por cada día transcurrido para no perderlos.
         if dias_transcurridos >= 1 and self._estado["ultimo_timestamp_diario"] > 0:
-            # LIMITAR a max 1 reset por llamada para evitar bloqueos
-            dias_a_procesar = min(dias_transcurridos, 1)
-            log_info("ITV", "Reset diario pendiente: {} dia(s) calculado(s), procesando {}".format(
-                dias_transcurridos, dias_a_procesar))
-            for _ in range(dias_a_procesar):
-                self._reset_diario(dia_actual, utc_actual)
+            log_info("ITV", "Reset diario pendiente: {} dia(s) calculado(s), procesando todos".format(
+                dias_transcurridos))
+            for i in range(dias_transcurridos):
+                ts_dia = self._estado["ultimo_timestamp_diario"] + (i + 1) * 86400
+                import time
+                dia_dia = time.localtime(ts_dia)[7]
+                self._reset_diario(dia_dia, ts_dia)
         elif self._estado["ultimo_timestamp_diario"] == 0:
             log_debug("ITV", "Inicializando ultimo_timestamp_diario = {}".format(utc_actual))
             self._estado['ultimo_timestamp_diario'] = utc_actual
@@ -304,7 +359,8 @@ class ITVManager:
 
     def _limpiar_historico_antiguo(self, utc_actual):
         limite = utc_actual - (7 * 86400)
-        for clave in ["ventilador_activaciones_historico"]:
+        # FIX: limpiar tambien capturas_historico, no solo ventilador
+        for clave in ["ventilador_activaciones_historico", "capturas_historico"]:
             self._estado[clave] = [e for e in self._estado[clave]
                                     if (e[0] if isinstance(e, list) else e) > limite]
 
@@ -337,8 +393,8 @@ class ITVManager:
         if rssi_alert:
             motivos.append(rssi_alert)
 
-
-        capturas_7d = self._estado["capturas_ultimos_7d"]
+        # FIX: calcular capturas de 7d correctamente sumando historial + actual
+        capturas_7d = self._calcular_capturas_7d(utc_actual)
         if capturas_7d == 0 and dias_acum > self._umbrales["dias_sin_capturas"]:
             try:
                 with open("agenda.json", "r") as f:
@@ -348,13 +404,29 @@ class ITVManager:
                 pass
 
         itv_necesaria = len(motivos) > 0
+        # FIX: self._itv_pendiente ahora se carga del estado, sobrevive a reinicios
         if itv_necesaria and not self._itv_pendiente:
             self._itv_pendiente = True
             self._motivo_itv = motivos
+            self._estado["itv_pendiente"] = True
+            self._estado["motivo_itv"] = motivos
             self._preparar_email_itv(utc_actual, motivos, dias_desde_ultima_itv)
             log_warn("ITV", "ALERTA: {}".format("; ".join(motivos)))
+            self._guardar_estado()  # persistir inmediatamente
 
         return itv_necesaria, motivos
+
+    # FIX: nuevo metodo para calcular capturas reales de 7 dias
+    def _calcular_capturas_7d(self, utc_actual):
+        """Suma capturas del dia en curso + historial de los ultimos 7 dias."""
+        total = self._estado.get("capturas_ultimos_7d", 0)
+        limite = utc_actual - (7 * 86400)
+        for entry in self._estado.get("capturas_historico", []):
+            if isinstance(entry, list) and len(entry) >= 2:
+                ts = entry[0]
+                if ts > limite:
+                    total += entry[1]
+        return total
 
     def _evaluar_temperatura(self):
         # Leer reinicios totales del contador persistente del sistema
@@ -426,7 +498,13 @@ class ITVManager:
         temp_max_7d_str = _fmt_temp(temp_max_7d)
         temp_max_30d_str = _fmt_temp(temp_max_30d)
 
-        capturas_total = sum(c[1] for c in self._estado["capturas_historico"]) if self._estado["capturas_historico"] else 0
+        # FIX: incluir capturas del dia actual en el total estimado
+        capturas_total = self._estado.get("capturas_ultimos_7d", 0)
+        if self._estado.get("capturas_historico"):
+            capturas_total += sum(c[1] for c in self._estado["capturas_historico"])
+
+        # FIX: usar calculo real de 7 dias en lugar de solo el dia en curso
+        capturas_7d = self._calcular_capturas_7d(utc_actual)
 
         rssi_resumen = {}
         for sat, puntos in self._estado["rssi_por_satelite"].items():
@@ -446,7 +524,7 @@ class ITVManager:
                 "temp_max_7d": temp_max_7d_str,
                 "temp_max_30d": temp_max_30d_str,
                 "capturas_total_estimado": capturas_total,
-                "capturas_7d": self._estado["capturas_ultimos_7d"],
+                "capturas_7d": capturas_7d,
                 "rssi_por_satelite": rssi_resumen,
             },
 
@@ -530,6 +608,8 @@ class ITVManager:
         self._estado["ultimo_timestamp_diario"] = utc_actual
         self._itv_pendiente = False
         self._motivo_itv = []
+        self._estado["itv_pendiente"] = False
+        self._estado["motivo_itv"] = []
         # borrar email ITV pendiente si existe
         try:
             if ITV_EMAIL_FICHERO in os.listdir():
@@ -544,8 +624,11 @@ class ITVManager:
         # Prepara email ITV pendiente. NO orquesta transición de fase
         self._itv_pendiente = True
         self._motivo_itv = [motivo]
+        self._estado["itv_pendiente"] = True
+        self._estado["motivo_itv"] = [motivo]
         self._preparar_email_itv(utc_actual, [motivo], 0)
         log_warn("ITV", "ITV forzada: {} -> email ITV preparado".format(motivo))
+        self._guardar_estado()
 
     # ------------------------------------------------------------------
     # Estado para debug / heartbeat
