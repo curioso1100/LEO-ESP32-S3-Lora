@@ -223,6 +223,41 @@ def guardar_f4_fallos(n):
 import time
 
 
+
+# --- helpers para fase4 (checkpoint + flag estado enviado) ---
+def estado_enviado():
+    try:
+        with open("estado.json") as f:
+            return json.load(f).get("est_env", 0) == 1
+    except:
+        return False
+
+def set_estado_enviado(v):
+    try:
+        with open("estado.json") as f:
+            d = json.load(f)
+        d["est_env"] = 1 if v else 0
+        with open("estado.json", "w") as f:
+            json.dump(d, f)
+            f.flush()
+            os.sync()
+    except:
+        pass
+
+def checkpoint_capturas(n):
+    try:
+        with open("estado_pendiente.json") as f:
+            d = json.load(f)
+        c = d.get("capturas", [])
+        d["capturas"] = c[n:] if n < len(c) else []
+        with open("estado_pendiente.json", "w") as f:
+            json.dump(d, f)
+            f.flush()
+            os.sync()
+    except:
+        pass
+
+
 class ConfigFase3:
     def __init__(self, config):
         self._raw = config

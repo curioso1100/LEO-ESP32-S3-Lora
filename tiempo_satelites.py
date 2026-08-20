@@ -100,10 +100,8 @@ def parsear_timestamp(ts_str):
 
 
 def formatear_fecha_utc(timestamp):
-    """Convierte timestamp Unix real (epoch 1970) a 'YYYY-MM-DD HH:MM:SS UTC'.
-    IMPORTANTE: time.localtime() en MicroPython ESP32 usa epoch 2000,
-    por eso restamos _EPOCH_OFFSET antes de pasar el timestamp.
-    """
+    # Convierte timestamp Unix real (epoch 1970) a 'YYYY-MM-DD HH:MM:SS UTC'. IMPORTANTE: time.localtime() en MicroPython ESP32 usa epoch 2000,
+    # por eso restamos _EPOCH_OFFSET antes de pasar el timestamp.
     try:
         t = time.localtime(timestamp - _EPOCH_OFFSET)
         return "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d} UTC".format(
@@ -113,7 +111,7 @@ def formatear_fecha_utc(timestamp):
 
 
 def formatear_fecha_local(timestamp):
-    """Convierte timestamp Unix real (epoch 1970) a hora local española (CEST/CET)."""
+    # Convierte timestamp Unix real (epoch 1970) a hora local española (CEST/CET)
     try:
         desfase = obtener_desfase_espana(timestamp)
         local_ts = timestamp + desfase
@@ -437,50 +435,3 @@ def obtener_objeto_satelite(utc_api_actual, debug_activo=True):
             return p
     return None
 
-
-if __name__ == "__main__":
-    print("\n" + "=" * 60)
-    print("--- DIAGNOSTICO AUTONOMO DE DATOS_SATELITES ---")
-    print("=" * 60)
-
-
-    try:
-        with open("config.json", "r") as cf:
-            c = json.load(cf)
-            ssid         = c["wifi_ssid"]
-            password     = c["wifi_pass"]
-            max_intentos = int(c["seguridad_hardware"].get("max_intentos_wifi", 10))
-        print("[OK] Credenciales leidas de config.json con exito.")
-    except Exception as e_cfg:
-        print("[ERROR CRITICO] No se pudo leer config.json:", e_cfg)
-        ssid, password, max_intentos = None, None, 0
-
-    if ssid:
-        print(f"[DIAGNOSTICO RED] Conectando a SSID: '{ssid}'...")
-        import network
-        wlan = network.WLAN(network.STA_IF)
-        try:
-            if wlan.isconnected():
-                wlan.disconnect()
-            wlan.active(False)
-            time.sleep_ms(200)
-        except:
-            pass
-
-        wlan.active(True)
-        wlan.connect(ssid, password)
-
-        intentos = 0
-        while not wlan.isconnected() and intentos < max_intentos:
-            print(f" [WiFi] Intentando... ({intentos + 1}/{max_intentos})")
-            time.sleep(2)
-            intentos += 1
-
-        if wlan.isconnected():
-            print(f"[OK] WiFi Conectado! IP: {wlan.ifconfig()[0]}")
-            fecha_hoy = "{:04d}-{:02d}-{:02d}".format(*time.localtime()[:3])
-            descargar_agenda_completa(fecha_hoy)
-            wlan.active(False)
-            print("[INFO] WiFi desconectado para cerrar el diagnostico.")
-        else:
-            print("[ERROR] Imposible conectar al router.")
