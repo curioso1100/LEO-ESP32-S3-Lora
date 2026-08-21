@@ -168,7 +168,6 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None, t0=None, mx=None):
         log_info("FASE4", "Modo no-vacio activo: 0 capturas, omitiendo envio de estado")
         del estado_pendiente, heartbeats, capturas
         gc.collect()
-        set_estado_enviado(False)
         borrar_estado_pendiente()
         _borrar_logs_originales()
         return True
@@ -228,7 +227,6 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None, t0=None, mx=None):
 
     if num_cap <= 0:
         log_info("FASE4", "Sin capturas para enviar.")
-        set_estado_enviado(False)
         borrar_estado_pendiente()
         _borrar_logs_originales()
         return True
@@ -314,7 +312,6 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None, t0=None, mx=None):
 
     if todos_enviados:
         log_info("FASE4", "Todos los fragmentos de capturas enviados correctamente")
-        set_estado_enviado(False)
         borrar_estado_pendiente()
         _borrar_logs_originales()
         return True

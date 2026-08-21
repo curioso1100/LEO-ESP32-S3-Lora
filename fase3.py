@@ -9,7 +9,7 @@ import gc
 import os
 
 import placa
-from config_system import guardar_fase, obtener_config, leer_reinicios, incrementar_reinicios, limpiar_backups_residuales
+from config_system import guardar_fase, obtener_config, leer_reinicios, incrementar_reinicios, limpiar_backups_residuales, set_estado_enviado
 from logger import (
     log_info, log_debug, log_warn, log_error, log_exception,
     rotar_logs_txt, escribir_heartbeat, log_persistente
@@ -264,6 +264,7 @@ def ejecutar():
                         # V9.1: resetear contadores tras preparar estado
                         paquetes_capturados[0] = 0
                         paquetes_descartados[0] = 0
+                        set_estado_enviado(False)
                         guardar_fase(4)
                         _intentar_transicion_fase4(radio)
 
@@ -328,6 +329,7 @@ def ejecutar():
                 # V9.1: resetear contadores tras preparar estado
                 paquetes_capturados[0] = 0
                 paquetes_descartados[0] = 0
+                set_estado_enviado(False)
                 guardar_fase(4)
                 _intentar_transicion_fase4(radio)
 
