@@ -258,6 +258,30 @@ def checkpoint_capturas(n):
         pass
 
 
+
+
+def get_horas_reinicio():
+    """Devuelve lista de strings 'HH:MM' desde config.json, o [] si no existe."""
+    try:
+        cfg = obtener_config()
+        horas = cfg.get("horas_de_reinicio", [])
+        if isinstance(horas, list):
+            resultado = []
+            for h in horas:
+                s = str(h).strip()
+                if len(s) == 5 and s[2] == ":":
+                    try:
+                        hh = int(s[0:2])
+                        mm = int(s[3:5])
+                        if 0 <= hh < 24 and 0 <= mm < 60:
+                            resultado.append(s)
+                    except ValueError:
+                        pass
+            return resultado
+    except Exception:
+        pass
+    return []
+
 class ConfigFase3:
     def __init__(self, config):
         self._raw = config
@@ -338,7 +362,7 @@ class EstadoEmail:
         actual_seg = hh * 3600 + mm * 60 + ss
         for hf_seg in self._horas_fijas:
             diff = actual_seg - hf_seg
-            if 0 <= diff <= 30:
+            if 0 <= diff <= 90:
                 if self._ultima_hora_enviada != hf_seg:
                     self._ultima_hora_enviada = hf_seg
                     self._guardar_ultima_hora(hf_seg)

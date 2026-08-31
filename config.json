@@ -60,51 +60,6 @@
         ]
       },
       "satelites": {
-        "TRISAT-4": {
-          "id": "67482",
-          "frec": 436700000,
-          "ancho_banda_hz": "250000",
-          "lora_sf": 10,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false,
-          "identificacion_header": {
-            "reglas": [
-              {
-                "offset": 0,
-                "valor": "0xA5",
-                "descripcion": "header_magic"
-              },
-              {
-                "offset": 1,
-                "valor": "0x01",
-                "descripcion": "version"
-              },
-              {
-                "offset": 2,
-                "valor": "0x80",
-                "descripcion": "sat_id_msb"
-              },
-              {
-                "offset": 3,
-                "valor": "0xFF",
-                "descripcion": "sat_id_lsb"
-              },
-              {
-                "offset": 4,
-                "valor": "0x80",
-                "mask": "0xF0",
-                "descripcion": "config_flags_msb"
-              }
-            ],
-            "longitud_minima": 5,
-            "familia_header": "trisat"
-          }
-        },
         "MORSAT-1": {
           "id": "67274",
           "frec": 435000000,
@@ -157,33 +112,6 @@
           "crc_on": false,
           "buscar_parametros": false,
           "lora_sync_word": 52
-        },
-        "MULE-4T": {
-          "id": "67286",
-          "frec": 436700000,
-          "ancho_banda_hz": "250000",
-          "lora_sf": 10,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false
-        },
-        "NORBY-2": {
-          "id": "57179",
-          "frec": 436650000,
-          "ancho_banda_hz": "250000",
-          "lora_sf": 10,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false,
-          "lora_sync_word": 18
         },
         "HUCSat": {
           "id": "69794",
@@ -239,11 +167,11 @@
             "familia_header": "sm3"
           }
         },
-        "CSTP-4.1": {
-          "id": "64895",
-          "frec": 436725000,
+        "Polytech-Universe-3": {
+          "id": "57191",
+          "frec": 435050000,
           "ancho_banda_hz": "62500",
-          "lora_sf": 10,
+          "lora_sf": 7,
           "lora_cr": 5,
           "implicit_header": false,
           "payload_len": 255,
@@ -253,10 +181,10 @@
           "buscar_parametros": false,
           "lora_sync_word": 18
         },
-        "CSTP-4.2": {
-          "id": "64883",
-          "frec": 437162000,
-          "ancho_banda_hz": "62500",
+        "MULE-4T": {
+          "id": "67286",
+          "frec": 436700000,
+          "ancho_banda_hz": "250000",
           "lora_sf": 10,
           "lora_cr": 5,
           "implicit_header": false,
@@ -265,21 +193,18 @@
           "lora_preamble_len": 8,
           "crc_on": false,
           "buscar_parametros": false,
-          "lora_sync_word": 18
-        },
-        "CSTP-2.11": {
-          "id": "61775",
-          "frec": 435950000,
-          "ancho_banda_hz": "62500",
-          "lora_sf": 10,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false,
-          "lora_sync_word": 18
+          "lora_sync_word": 18,
+          "identificacion_header": {
+            "reglas": [
+              {
+                "offset": 0,
+                "valor": "0x8E",
+                "descripcion": "header_magic"
+              }
+            ],
+            "longitud_minima": 1,
+            "familia_header": "mule4t"
+          }
         }
       }
     }
@@ -318,7 +243,7 @@
   "max_logs_txt_lineas": 200,
   "max_errores_email_chars": 2000,
   "itv": {
-    "dias_maximos": 90,
+    "dias_maximos": 30,
     "ventilador_activaciones_7d": 15,
     "delta_temp_maxima_c": 5,
     "delta_rssi_db": 10,
@@ -329,5 +254,9 @@
   "buscar_parametros": false,
   "doppler": false,
   "activar_rx_diag": true,
-  "min_satelites_porcentaje": 75
+  "min_satelites_porcentaje": 75,
+  "horas_de_reinicio": [
+    "00:00",
+    "12:00"
+  ]
 }

@@ -9,7 +9,7 @@ import gc
 import os
 
 import placa
-from config_system import guardar_fase, obtener_config, leer_reinicios, incrementar_reinicios, limpiar_backups_residuales, set_estado_enviado
+from config_system import guardar_fase, obtener_config, leer_reinicios, incrementar_reinicios, limpiar_backups_residuales, set_estado_enviado, get_horas_reinicio
 from logger import (
     log_info, log_debug, log_warn, log_error, log_exception,
     rotar_logs_txt, escribir_heartbeat, log_persistente
@@ -37,8 +37,9 @@ _ESTADO_PENDIENTE_FILE = "estado_pendiente.json"
 def _estado_pendiente_existe():
     # Devuelve True si ya hay un estado pendiente guardado
     try:
-        return _ESTADO_PENDIENTE_FILE in os.listdir()
-    except Exception:
+        os.stat(_ESTADO_PENDIENTE_FILE)
+        return True
+    except OSError:
         return False
 
 
@@ -63,6 +64,89 @@ def _intentar_transicion_fase4(radio):
     except Exception as e:
         log_warn("FASE3", "Error en transicion a fase4: {}".format(e))
         log_persistente("FASE3", "Error en transicion a fase4: {}".format(e), "WARN")
+
+
+# =========================================================================
+# REINICIO PROGRAMADO (horas_de_reinicio en config.json)
+# =========================================================================
+
+_REINICIO_PROG_FLAG = "reinicio_prog.flag"
+
+
+def _comprobar_reinicio_programado(radio, t_local, estado_actual, hay_estado_pendiente):
+    fecha_actual = "{:04d}-{:02d}-{:02d}".format(t_local[0], t_local[1], t_local[2])
+    hora_actual = "{:02d}:{:02d}".format(t_local[3], t_local[4])
+
+    # 1. ¿Hay un reinicio pendiente de un pase anterior?
+    if estado_actual == "BASE" and not hay_estado_pendiente:
+        try:
+            with open("reinicio_prog.pendiente", "r") as f:
+                pendiente = f.read().strip()
+            if pendiente:
+                hora_pend = pendiente.split(" ")[1]
+                log_info("REINICIO_PROG", "Recuperando reinicio pendiente de las {}".format(hora_pend))
+                log_persistente("REINICIO_PROG", "Recuperando reinicio pendiente de las {}".format(hora_pend), "INFO")
+                radio.standby()
+                time.sleep_ms(500)
+                os.sync()
+                try:
+                    os.remove("reinicio_prog.pendiente")
+                except Exception:
+                    pass
+                try:
+                    with open("reinicio_prog.flag", "w") as f:
+                        f.write(pendiente)
+                        f.flush()
+                        os.sync()
+                except Exception:
+                    pass
+                guardar_fase(1)
+                time.sleep_ms(200)
+                placa.reiniciar()
+        except Exception:
+            pass
+
+    # 2. ¿Es hora de reinicio ahora?
+    horas = get_horas_reinicio()
+    if not horas:
+        return
+    if hora_actual not in horas:
+        return
+    clave = fecha_actual + " " + hora_actual
+    try:
+        with open("reinicio_prog.flag", "r") as f:
+            if f.read().strip() == clave:
+                return
+    except Exception:
+        pass
+
+    # 3. ¿Podemos reiniciar ahora?
+    if estado_actual == "BASE" and not hay_estado_pendiente:
+        log_info("REINICIO_PROG", "Hora programada {} alcanzada. Reiniciando...".format(hora_actual))
+        log_persistente("REINICIO_PROG", "Reinicio programado a las {}".format(hora_actual), "INFO")
+        radio.standby()
+        time.sleep_ms(500)
+        os.sync()
+        try:
+            with open("reinicio_prog.flag", "w") as f:
+                f.write(clave)
+                f.flush()
+                os.sync()
+        except Exception:
+            pass
+        guardar_fase(1)
+        time.sleep_ms(200)
+        placa.reiniciar()
+    else:
+        # Estamos ocupados (PASE o estado_pendiente). Marcar como pendiente.
+        try:
+            with open("reinicio_prog.pendiente", "w") as f:
+                f.write(clave)
+                f.flush()
+                os.sync()
+            log_info("REINICIO_PROG", "Hora {} alcanzada pero ocupado ({}). Pendiente.".format(hora_actual, estado_actual))
+        except Exception:
+            pass
 
 
 # =========================================================================
@@ -380,12 +464,14 @@ def ejecutar():
             log_persistente("ITV", msg_itv, "WARN")
 
 
+        # --- Comprobar reinicio programado (una vez por ciclo, fuera del sleep) ---
+        hay_estado_pend = _estado_pendiente_existe()
+        _, _, t_local_reinicio = obtener_tiempo_actual()
+        _comprobar_reinicio_programado(radio, t_local_reinicio, estado_actual, hay_estado_pend)
+
         # --- Sleep ---
         sleep_s = _SLEEP_PASE_ACTIVO_S if sat_obj is not None else _SLEEP_ESPERA_S
         for _ in range(sleep_s):
             _comprobar_prg(radio, itv)
             time.sleep(1)
 
-
-if __name__ == "__main__":
-    ejecutar()

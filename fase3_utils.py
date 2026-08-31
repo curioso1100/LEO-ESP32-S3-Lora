@@ -250,6 +250,19 @@ def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
         pass
     gc.collect()
 
+    # Leer flag de reinicio programado para incluirlo en el email de estado (una sola vez)
+    reinicio_prog_info = ""
+    try:
+        with open("reinicio_prog.flag", "r") as f:
+            reinicio_prog_info = f.read().strip()
+        # Borrar tras leer para no repetir la nota en emails futuros
+        try:
+            os.remove("reinicio_prog.flag")
+        except Exception:
+            pass
+    except Exception:
+        pass
+
     try:
         estado_pendiente = {
             "tipo": "estado",
@@ -265,7 +278,11 @@ def preparar_estado_pendiente(temp_cpu, ventilador_on, fs_libre_kb,
             "estado_enviado": False,
             'errores': ''
         }
-        estado_pendiente['errores'] = leer_errores_para_email('errores.log')
+        errores_texto = leer_errores_para_email('errores.log')
+        if reinicio_prog_info:
+            estado_pendiente['errores'] = "[NOTA] Reinicio programado: {}\n\n{}".format(reinicio_prog_info, errores_texto)
+        else:
+            estado_pendiente['errores'] = errores_texto
         gc.collect()
         with open("estado_pendiente.json", "w") as f:
             json.dump(estado_pendiente, f)
