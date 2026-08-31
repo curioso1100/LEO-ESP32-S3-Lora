@@ -261,7 +261,7 @@ def ejecutar():
                         hay_estado = True
 
                     if hay_estado:
-                        # V9.1: resetear contadores tras preparar estado
+                        # resetear contadores tras preparar estado
                         paquetes_capturados[0] = 0
                         paquetes_descartados[0] = 0
                         set_estado_enviado(False)
@@ -326,7 +326,7 @@ def ejecutar():
                 hay_estado = True
 
             if hay_estado:
-                # V9.1: resetear contadores tras preparar estado
+                # resetear contadores tras preparar estado
                 paquetes_capturados[0] = 0
                 paquetes_descartados[0] = 0
                 set_estado_enviado(False)
