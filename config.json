@@ -223,11 +223,7 @@
   "max_hb_email": 40,
   "email_estado_automatico": true,
   "email_estado_vacio": true,
-  "email_estado_horas_fijas": [
-    "00:08",
-    "15:30",
-    "21:00"
-  ],
+  "email_estado_horas_fijas": [],
   "ficheros_a_actualizar": [],
   "delay_entre_emails_seg": 60,
   "ventilador_gpio": 38,
@@ -255,8 +251,5 @@
   "doppler": false,
   "activar_rx_diag": true,
   "min_satelites_porcentaje": 75,
-  "horas_de_reinicio": [
-    "00:00",
-    "12:00"
-  ]
+  "horas_de_reinicio": [ "00:00", "12:00" ]
 }

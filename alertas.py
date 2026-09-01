@@ -275,6 +275,18 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
             except Exception as e_horas:
                 log_warn("SMTP", "No se pudo incluir horas de estado: {}".format(e_horas))
 
+            # --- HORAS DE REINICIO PROGRAMADO ---
+            try:
+                horas_reinicio = c.get("horas_de_reinicio", [])
+                if horas_reinicio:
+                    reinicio_str = ", ".join(horas_reinicio)
+                else:
+                    reinicio_str = "Ninguna"
+                linea_reinicio = "Horas de reinicio: {}\r\n".format(reinicio_str)
+                sock.write(linea_reinicio.encode())
+            except Exception as e_reinicio:
+                log_warn("SMTP", "No se pudo incluir horas de reinicio: {}".format(e_reinicio))
+
             # --- Añadir logs operativos al final del reporte ---
             if texto_extra:
                 try:

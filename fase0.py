@@ -435,11 +435,11 @@ def _actualizar_archivo_py(url):
 def _actualizar_modulos_py(cfg_dict):
     urls = cfg_dict.get("ficheros_a_actualizar", [])
     if not urls:
-        log_debug("FASE0", "No hay ficheros_a_actualizar en config.json")
+        log_debug("FASE0", "No hay ficheros a actualizar en config.json")
         return False
 
     if not isinstance(urls, list):
-        log_warn("FASE0", "ficheros_a_actualizar no es una lista")
+        log_warn("FASE0", "ficheros a actualizar no es una lista")
         return False
 
     log_persistente("FASE0", "Iniciando actualizacion de {} modulo(s) .py".format(len(urls)), "INFO")
@@ -578,7 +578,7 @@ def test():
             print("Satelites en perfil '{}': {}".format(grupo, sats))
             print("Validacion estructural:", "OK" if _validar_config(cfg) else "FALLIDA")
             urls = cfg.get("ficheros_a_actualizar", [])
-            print("ficheros_a_actualizar:", urls)
+            print("ficheros a actualizar:", urls)
             for url in urls:
                 nombre = _extraer_nombre_archivo(url)
                 print("  URL: {} -> nombre: {}".format(url, nombre))
