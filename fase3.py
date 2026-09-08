@@ -20,7 +20,6 @@ CONFIG = obtener_config()
 
 from doppler_motor import calcular_parametros_satelite
 
-
 # =========================================================================
 # CONSTANTES
 # =========================================================================
@@ -42,14 +41,15 @@ def _estado_pendiente_existe():
     except OSError:
         return False
 
-
-def _comprobar_prg(radio, itv):
+def _comprobar_prg(radio, itv, flag_itv_alerta=None):
     # Gestiona el botón PRG. Única función: marcar ITV como realizada
     if placa.detectar_pulsacion_prg():
         log_warn("PRG", "Pulsacion PRG detectada -> marcando ITV realizada")
         itv.marcar_itv_realizada(obtener_unix_utc_real(), "Boton PRG pulsado")
+        # FIX: resetear flag de alerta logueada para permitir futuras alertas
+        if flag_itv_alerta is not None:
+            flag_itv_alerta[0] = False
         placa.led_blink(5, pausa_ms=100)
-
 
 def _intentar_transicion_fase4(radio):
     # Completa la transicion a fase4 reiniciando SIEMPRE.
@@ -65,13 +65,10 @@ def _intentar_transicion_fase4(radio):
         log_warn("FASE3", "Error en transicion a fase4: {}".format(e))
         log_persistente("FASE3", "Error en transicion a fase4: {}".format(e), "WARN")
 
-
 # =========================================================================
 # REINICIO PROGRAMADO (horas_de_reinicio en config.json)
 # =========================================================================
-
 _REINICIO_PROG_FLAG = "reinicio_prog.flag"
-
 
 def _comprobar_reinicio_programado(radio, t_local, estado_actual, hay_estado_pendiente):
     fecha_actual = "{:04d}-{:02d}-{:02d}".format(t_local[0], t_local[1], t_local[2])
@@ -148,11 +145,9 @@ def _comprobar_reinicio_programado(radio, t_local, estado_actual, hay_estado_pen
         except Exception:
             pass
 
-
 # =========================================================================
 # FUNCIÓN PÚBLICA PRINCIPAL
 # =========================================================================
-
 def ejecutar():
     placa.led_blink(3)
     placa.led_off()
@@ -264,7 +259,7 @@ def ejecutar():
     reinicios = leer_reinicios()
     ultimo_satelite_en_cielo = None
     thonny_info_mostrada = False
-
+    itv_alerta_logueada = False  # FIX: evitar spam de logs ITV cada ciclo
 
     while True:
         # Seguridad RAM
@@ -279,7 +274,7 @@ def ejecutar():
             placa.reiniciar()
 
         # Botón PRG (solo marcar ITV)
-        _comprobar_prg(radio, itv)
+        _comprobar_prg(radio, itv, [itv_alerta_logueada])
 
         # Tiempo
         utc, reloj_str, t_local = obtener_tiempo_actual()
@@ -454,15 +449,17 @@ def ejecutar():
             utc_actual=utc,
             t_local_tuple=t_local
         )
-        # No transiciona a fase4 por ITV. El email ITV se envía
-        # desde fase2 una vez al día. Aquí solo se prepara el archivo pendiente.
+        # No transiciona a fase4 por ITV. El email ITV se envía desde fase2 una vez al día. Aquí solo se prepara el archivo pendiente.
         itv_necesaria, motivos_itv = itv.evaluar(utc, t_local)
-        if itv_necesaria:
+        # solo loguear alerta ITV en el flanco ascendente (primera detección) para evitar spam de logs cada 5-7 segundos en el bucle.
+        if itv_necesaria and not itv_alerta_logueada:
             msg_itv = "ALERTA ITV detectada: {}. Email preparado para fase2.".format(
                 "; ".join(motivos_itv))
             log_warn("ITV", msg_itv)
             log_persistente("ITV", msg_itv, "WARN")
-
+            itv_alerta_logueada = True
+        elif not itv_necesaria:
+            itv_alerta_logueada = False
 
         # --- Comprobar reinicio programado (una vez por ciclo, fuera del sleep) ---
         hay_estado_pend = _estado_pendiente_existe()
@@ -472,6 +469,5 @@ def ejecutar():
         # --- Sleep ---
         sleep_s = _SLEEP_PASE_ACTIVO_S if sat_obj is not None else _SLEEP_ESPERA_S
         for _ in range(sleep_s):
-            _comprobar_prg(radio, itv)
+            _comprobar_prg(radio, itv, [itv_alerta_logueada])
             time.sleep(1)
-

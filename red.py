@@ -19,7 +19,7 @@ NTP_SERVERS = (
 )
 
 # =========================================================================
-# MAPEO DE ESTADOS WiFi - MicroPython ESP32 (códigos actuales)
+# MAPEO DE ESTADOS WiFi - MicroPython ESP32
 # =========================================================================
 _ESTADOS_WIFI = {
     1000: "IDLE",
@@ -32,11 +32,41 @@ _ESTADOS_WIFI = {
     204:  "HANDSHAKE_TIMEOUT",
     211:  "NO_AP_AUTHMODE_THRESHOLD",
     212:  "NO_AP_RSSI_THRESHOLD",
+    # --- Reason codes ESP-IDF (desconexión) ---
+    1:    "UNSPECIFIED",
+    2:    "AUTH_EXPIRE",
+    3:    "AUTH_LEAVE",
+    4:    "ASSOC_EXPIRE",
+    5:    "ASSOC_TOOMANY",
+    6:    "NOT_AUTHED",
+    7:    "NOT_ASSOCED",
+    8:    "ASSOC_LEAVE",
+    9:    "ASSOC_NOT_AUTHED",
+    10:   "DISASSOC_PWRCAP_BAD",
+    11:   "DISASSOC_SUPCHAN_BAD",
+    12:   "IE_INVALID",
+    13:   "MIC_FAILURE",
+    14:   "4WAY_HANDSHAKE_TIMEOUT",
+    15:   "GROUP_KEY_UPDATE_TIMEOUT",
+    16:   "IE_IN_4WAY_DIFFERS",
+    17:   "GROUP_CIPHER_INVALID",
+    18:   "PAIRWISE_CIPHER_INVALID",
+    19:   "AKMP_INVALID",
+    20:   "UNSUPP_RSN_IE_VERSION",
+    21:   "INVALID_RSN_IE_CAP",
+    22:   "802_1X_AUTH_FAILED",
+    23:   "CIPHER_SUITE_REJECTED",
+    24:   "INVALID_PMKID",
+    25:   "BEACON_TIMEOUT",
+    26:   "NO_AP_FOUND",
+    27:   "AUTH_FAIL",
 }
 
 # Estados que indican progreso (no son errores definitivos)
 _ESTADOS_PROGRESO = (1000, 1001)
-# Estados que indican error definitivo en esta ronda
+
+# Estados/Reason codes que indican error definitivo en esta ronda.
+# Cualquier código < 1000 es un reason code del ESP-IDF (error de capa inferior).
 _ESTADOS_ERROR = (201, 203, 204, 211, 212)
 
 
@@ -44,81 +74,92 @@ def _nombre_estado(codigo):
     return _ESTADOS_WIFI.get(codigo, "DESCONOCIDO({})".format(codigo))
 
 
+def _es_reason_code_error(codigo):
+    # Devuelve True si el código es un reason code de error del ESP-IDF.
+    # Cualquier valor entre 1 y 255 (reason codes) o los errores conocidos >=200
+    return (1 <= codigo <= 255) or (codigo in _ESTADOS_ERROR)
+
+
 # =========================================================================
 # WIFI
 # =========================================================================
 
-def _reset_wifi_completo(wlan):
-    # FIX: Asegurar disconnect antes de apagar para limpiar estado del IDF
-    try:
-        if wlan.active():
+def _apagar_todo_wifi():
+    # Apaga tanto STA como AP para evitar conflictos de modo dual
+    for modo in (network.STA_IF, network.AP_IF):
+        try:
+            w = network.WLAN(modo)
+            if w.active():
+                try:
+                    w.disconnect()
+                except Exception:
+                    pass
+                time.sleep_ms(500)
             try:
-                wlan.disconnect()
+                w.active(False)
             except Exception:
                 pass
-            time.sleep_ms(1000)  # FIX: subido a 1s
-    except Exception:
-        pass
+        except Exception:
+            pass
+    gc.collect()
 
-    try:
-        wlan.active(False)
-    except Exception:
-        pass
 
-    # CRITICO: el PHY WiFi del ESP32 necesita >=2s para liberar buffers
-    time.sleep_ms(2500)
+def _reset_wifi_completo(wlan):
+    _apagar_todo_wifi()
 
-    # Verificar que se apago
-    intentos = 0
-    while wlan.active() and intentos < 5:
-        time.sleep_ms(200)
-        intentos += 1
+    # CRITICO: el PHY WiFi del ESP32 necesita >=3s para liberar buffers tras un reason code de error (AUTH_EXPIRE, ASSOC_EXPIRE, etc.)
+    time.sleep_ms(3500)
 
-    # Volver a encender
+    # Volver a encender solo STA
     try:
         wlan.active(True)
     except Exception:
         pass
 
-    # Esperar a que el interfaz este realmente activo
+    # Desactivar power management. El PM del ESP-IDF puede interferir con el timing del handshake WPA2 tras un fallo previo.
+    try:
+        wlan.config(pm=network.WLAN.PM_NONE)
+    except Exception:
+        pass
+
+    # Esperar a que el interfaz esté realmente activo
     intentos = 0
-    while not wlan.active() and intentos < 10:
-        time.sleep_ms(200)
+    while not wlan.active() and intentos < 15:
+        time.sleep_ms(300)
         try:
             wlan.active(True)
         except Exception:
             pass
         intentos += 1
 
-    # FIX: Delay adicional aumentado para estabilizacion del PHY tras encender
-    time.sleep_ms(2500)
+    # Delay aumentado a 4s para estabilización del PHY tras encender, especialmente tras reason codes de error.
+    time.sleep_ms(4000)
 
 
 def _intentar_conexion(wlan, ssid, password, max_intentos, etiqueta=""):
-    # Intenta conectar y espera hasta max_intentos ciclos de 1s.
-    # Retorna (conectado: bool, estado_final: int)
+    # Intenta conectar y espera hasta max_intentos ciclos de 1s. Retorna (conectado: bool, estado_final: int)
 
     if not wlan.active():
         log_warn("WIFI", "{}Interfaz no activo. Abortando conexion.".format(etiqueta))
         return False, 1000
 
-    # FIX: Desactivar reconexion automatica del driver ANTES de cualquier otra cosa
+    # Desactivar reconexion automatica del driver ANTES de cualquier otra cosa
     try:
         wlan.config(reconnects=0)
     except Exception:
         pass
 
-    # FIX: Asegurar que no hay conexion/colgada pendiente del IDF
+    # Asegurar que no hay conexion/colgada pendiente del IDF. Aumentado a 1s para que el driver libere completamente la asociación anterior.
     try:
         wlan.disconnect()
-        time.sleep_ms(300)
+        time.sleep_ms(1000)
     except Exception:
         pass
 
     wlan.connect(ssid, password)
 
     # Espera inicial para que el proceso de asociacion comience
-    time.sleep_ms(2000)
+    time.sleep_ms(2500)
 
     intentos = 0
     ultimo_estado = -1
@@ -131,14 +172,19 @@ def _intentar_conexion(wlan, ssid, password, max_intentos, etiqueta=""):
             log_debug("WIFI", "{}Intento {}/{}  Estado: {}".format(
                 etiqueta, intentos + 1, max_intentos, _nombre_estado(estado)))
 
-            if estado in _ESTADOS_ERROR:
+            # Detectar reason codes del ESP-IDF (< 1000) como errores definitivos y abortar inmediatamente. El driver está en estado corrupto.
+            if _es_reason_code_error(estado):
                 errores_consecutivos += 1
-                # Si hay 2 errores consecutivos, abortar esta ronda
+                if errores_consecutivos >= 1:
+                    log_warn("WIFI", "{}Reason code ESP-IDF detectado ({}). Abortando ronda.".format(
+                        etiqueta, _nombre_estado(estado)))
+                    break
+            elif estado in _ESTADOS_ERROR:
+                errores_consecutivos += 1
                 if errores_consecutivos >= 2:
                     log_warn("WIFI", "{}Error definitivo detectado ({}). Abortando ronda.".format(
                         etiqueta, _nombre_estado(estado)))
                     break
-            # FIX: Abortar tambien ante estados anomalos persistentes (ej. codigo 2)
             elif estado not in _ESTADOS_PROGRESO and estado != 1010:
                 errores_consecutivos += 1
                 if errores_consecutivos >= 2:
@@ -175,33 +221,22 @@ def conectar_wifi():
 
     log_debug("WIFI", "SSID='{}' | PASS_len={}".format(ssid, len(password)))
 
-    # FIX 1: Limpieza agresiva en POWERON antes de crear el objeto principal.
-    # El IDF del ESP32 retiene config en NVS tras POWERON y puede dejar el PHY
-    # en un estado que devuelve codigos anomalos (ej. 2). Forzamos un ciclo
-    # completo de apagado antes de que red.py toque el WiFi.
+    # Limpieza agresiva en POWERON antes de crear el objeto principal. Apagar tanto STA como AP para evitar estado dual del IDF.
     if machine.reset_cause() == machine.PWRON_RESET:
         log_debug("WIFI", "POWERON detectado. Limpiando estado WiFi persistente...")
-        try:
-            w_tmp = network.WLAN(network.STA_IF)
-            w_tmp.active(True)
-            w_tmp.disconnect()
-            time.sleep_ms(1000)
-            w_tmp.active(False)
-            time.sleep_ms(2000)
-        except Exception as e:
-            log_debug("WIFI", "Error en limpieza POWERON: {}".format(e))
+        _apagar_todo_wifi()
         log_debug("WIFI", "Esperando estabilizacion RF (POWERON)...")
-        time.sleep_ms(6000)  # FIX: 6s para asegurar calibracion PHY tras encendido en frio
+        # 8s para asegurar calibracion PHY tras encendido en frio
+        time.sleep_ms(8000)
 
-    # FIX 2: No reutilizamos un objeto WLAN viejo. Cada ronda crea uno nuevo
-    # para evitar que herede estado corrupto del IDF.
+    # Crear objeto STA. En MicroPython es un singleton, pero lo creamos limpio tras apagar todo.
+    wlan = network.WLAN(network.STA_IF)
 
     # ============================================================
     # RONDA 1: reset completo + conexion
     # ============================================================
     log_debug("WIFI", "Ronda 1: reset completo del interfaz STA...")
     gc.collect()
-    wlan = network.WLAN(network.STA_IF)  # FIX: objeto fresco
     _reset_wifi_completo(wlan)
 
     conectado, estado_final = _intentar_conexion(wlan, ssid, password, max_intentos, "R1 ")
@@ -219,22 +254,17 @@ def conectar_wifi():
     # ============================================================
     log_debug("WIFI", "Ronda 2: reset suave con objeto nuevo...")
     gc.collect()
-    try:
-        wlan.disconnect()
-    except Exception:
-        pass
-    try:
-        wlan.active(False)
-    except Exception:
-        pass
-    time.sleep_ms(5000)
+    _apagar_todo_wifi()
+    # Aumentado a 8s. El PHY necesita tiempo tras reason codes.
+    time.sleep_ms(8000)
 
-    wlan = network.WLAN(network.STA_IF)  # FIX: objeto fresco
+    wlan = network.WLAN(network.STA_IF)
     try:
         wlan.active(True)
+        wlan.config(pm=network.WLAN.PM_NONE)
     except Exception:
         pass
-    time.sleep_ms(2000)
+    time.sleep_ms(4000)
 
     conectado, estado_final = _intentar_conexion(wlan, ssid, password, max_intentos, "R2 ")
 
@@ -251,22 +281,17 @@ def conectar_wifi():
     # ============================================================
     log_debug("WIFI", "Ronda 3: reset ultra-agresivo...")
     gc.collect()
+    _apagar_todo_wifi()
+    # 10s de descanso. El driver ESP-IDF necesita tiempo para limpiar los reason codes de la memoria interna del PHY.
+    time.sleep_ms(10000)
+
+    wlan = network.WLAN(network.STA_IF)
     try:
-        wlan.disconnect()
-    except Exception:
-        pass
-    try:
-        wlan.active(False)
+        wlan.active(True)
+        wlan.config(pm=network.WLAN.PM_NONE)
     except Exception:
         pass
     time.sleep_ms(4000)
-
-    wlan = network.WLAN(network.STA_IF)  # FIX: objeto fresco
-    try:
-        wlan.active(True)
-    except Exception:
-        pass
-    time.sleep_ms(2000)
 
     conectado, estado_final = _intentar_conexion(wlan, ssid, password, max_intentos, "R3 ")
 
@@ -278,34 +303,16 @@ def conectar_wifi():
     log_warn("WIFI", msg_r3)
     log_persistente("WIFI", msg_r3, "WARN")
 
-    # --- Apagar limpiamente antes de salir ---
-    try:
-        wlan.active(False)
-    except Exception:
-        pass
+    # Apagar limpiamente antes de salir
+    _apagar_todo_wifi()
     led_patron_error()
     return False
 
 
 def apagar_wifi():
-    try:
-        wlan = network.WLAN(network.STA_IF)
-        try:
-            if wlan.active():
-                wlan.disconnect()
-                time.sleep_ms(200)
-        except Exception:
-            pass
-        try:
-            wlan.active(False)
-            time.sleep_ms(500)
-        except Exception:
-            pass
-    except Exception:
-        pass
+    _apagar_todo_wifi()
     gc.collect()
     log_debug("WIFI", "Interfaz WiFi apagada")
-
 
 # =========================================================================
 # NTP
@@ -328,3 +335,4 @@ def sincronizar_ntp():
 
     gc.collect()
     return False, None
+

@@ -72,6 +72,7 @@
           "lora_preamble_len": 10,
           "crc_on": false,
           "buscar_parametros": false,
+          "lora_sync_word": 18,
           "identificacion_header": {
             "reglas": [
               {
@@ -98,34 +99,6 @@
             "longitud_minima": 4,
             "familia_header": "morsat"
           }
-        },
-        "KOSAR-1.5": {
-          "id": "67264",
-          "frec": 436100000,
-          "ancho_banda_hz": "125000",
-          "lora_sf": 8,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false,
-          "lora_sync_word": 52
-        },
-        "HUCSat": {
-          "id": "69794",
-          "frec": 437400000,
-          "ancho_banda_hz": "125000",
-          "lora_sf": 8,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": false,
-          "lora_sync_word": 18
         },
         "SM-3.1": {
           "id": "67275",
@@ -167,11 +140,11 @@
             "familia_header": "sm3"
           }
         },
-        "Polytech-Universe-3": {
-          "id": "57191",
-          "frec": 435050000,
-          "ancho_banda_hz": "62500",
-          "lora_sf": 7,
+        "KOSAR-1.5": {
+          "id": "67264",
+          "frec": 436100000,
+          "ancho_banda_hz": "125000",
+          "lora_sf": 8,
           "lora_cr": 5,
           "implicit_header": false,
           "payload_len": 255,
@@ -179,7 +152,7 @@
           "lora_preamble_len": 8,
           "crc_on": false,
           "buscar_parametros": false,
-          "lora_sync_word": 18
+          "lora_sync_word": 52
         },
         "MULE-4T": {
           "id": "67286",
@@ -205,6 +178,62 @@
             "longitud_minima": 1,
             "familia_header": "mule4t"
           }
+        },
+        "HUCSat": {
+          "id": "69794",
+          "frec": 437400000,
+          "ancho_banda_hz": "125000",
+          "lora_sf": 8,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false,
+          "lora_sync_word": 18
+        },
+        "POLYTECH-5": {
+          "id": "61745",
+          "frec": 437885000,
+          "ancho_banda_hz": "62500",
+          "lora_sf": 7,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": false,
+          "lora_sync_word": 18
+        },
+        "HOD-HOD-1A": {
+          "id": "61768",
+          "frec": 436250000,
+          "ancho_banda_hz": "62500",
+          "lora_sf": 8,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": true,
+          "lora_sync_word": 18
+        },
+        "VLADIVOSTOK-1": {
+          "id": "61751",
+          "frec": 436805000,
+          "ancho_banda_hz": "62500",
+          "lora_sf": 8,
+          "lora_cr": 5,
+          "implicit_header": false,
+          "payload_len": 255,
+          "rx_iq": false,
+          "lora_preamble_len": 8,
+          "crc_on": false,
+          "buscar_parametros": true,
+          "lora_sync_word": 18
         }
       }
     }
@@ -241,7 +270,7 @@
   "itv": {
     "dias_maximos": 30,
     "ventilador_activaciones_7d": 15,
-    "delta_temp_maxima_c": 5,
+    "delta_temp_maxima_c": 10,
     "delta_rssi_db": 10,
     "reinicios_7d": 2,
     "dias_sin_capturas": 7
@@ -250,6 +279,9 @@
   "buscar_parametros": false,
   "doppler": false,
   "activar_rx_diag": true,
-  "min_satelites_porcentaje": 75,
-  "horas_de_reinicio": [ "00:00", "12:00" ]
+  "min_satelites_porcentaje": 70,
+  "horas_de_reinicio": [
+    "00:00",
+    "12:00"
+  ]
 }
