@@ -63,10 +63,27 @@ def _fragmentar_capturas(capturas):
     return trozos
 
 
+def _enriquecer_heartbeats(heartbeats):
+    resultado = []
+    for hb in heartbeats:
+        tok = hb.split()
+        if len(tok) > 4 and tok[3] == "PASE":
+            tok[4] = "<b>" + tok[4] + "</b>"
+        for i, tk in enumerate(tok):
+            if tk.startswith("IRQ="):
+                tok[i] = "<b>" + tk + "</b>"
+        resultado.append(" ".join(tok))
+    return resultado
+
+
 def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
                              temp_cpu, ventilador_on, fs_libre_kb, errores,
                              paquetes_capturados=0, paquetes_descartados=0,
                              horas_pendientes=None, rssi_wifi=None):
+    if errores:
+        errores = (errores.replace("&", "&amp;")
+                          .replace("<", "&lt;")
+                          .replace(">", "&gt;"))
     partes = []
     partes.append("ESTADO DEL SISTEMA")
     if rssi_wifi is not None:
@@ -86,7 +103,7 @@ def _construir_email_estado(heartbeats, num_hb, base_count, pase_count,
                 ", ".join(horas_pendientes)))
         partes.append("")
         partes.append("=== TODOS LOS HEARTBEATS ({}) ===".format(num_hb))
-        partes.extend(heartbeats)
+        partes.extend(_enriquecer_heartbeats(heartbeats))
     else:
         partes.append("(Sin heartbeats acumulados)")
         if horas_pendientes:
@@ -132,14 +149,15 @@ def _construir_email_capturas(trozo_capturas, num_trozo, total_trozos,
     return "\n".join(partes)
 
 
-def _enviar_email_smtp(asunto, cuerpo, debug_activo, rssi_wifi=None):
+def _enviar_email_smtp(asunto, cuerpo, debug_activo, rssi_wifi=None, html=False):
     import alertas
     return alertas.enviar_correo_bloques(
         asunto,
         modo_reporte=False,
         texto_telemetria=cuerpo,
         debug_activo=debug_activo,
-        rssi_wifi=rssi_wifi
+        rssi_wifi=rssi_wifi,
+        html=html
     )
 
 
@@ -207,7 +225,7 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None, t0=None, mx=None):
 
         asunto1 = "{}: Estado {} - {} CAP {} HB".format(
             nombre_proyecto(), version(), num_cap, num_hb)
-        exito1 = _enviar_email_smtp(asunto1, cuerpo_estado, DEBUG_MODO, rssi_wifi)
+        exito1 = _enviar_email_smtp(asunto1, cuerpo_estado, DEBUG_MODO, rssi_wifi, html=True)
         del cuerpo_estado
         gc.collect()
 

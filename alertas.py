@@ -84,7 +84,7 @@ def _sock_write_all(sock, data, chunk_size=256, pausa_ms=100):
             raise
 
 
-def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug_activo=False, rssi_wifi=None, texto_extra=""):
+def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug_activo=False, rssi_wifi=None, texto_extra="", html=False):
     import socket
     import ssl
     from tiempo_satelites import obtener_desfase_espana
@@ -204,7 +204,11 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
         sock.write(("From: {}\r\n".format(remitente_limpio)).encode())
         sock.write(("To: {}\r\n".format(destinatario_limpio)).encode())
         sock.write(("Subject: {}\r\n".format(asunto_limpio)).encode())
-        sock.write("Content-Type: text/plain; charset=UTF-8\r\n\r\n".encode())
+        if html:
+            sock.write("Content-Type: text/html; charset=UTF-8\r\n\r\n".encode())
+            sock.write(b"<pre>\r\n")
+        else:
+            sock.write("Content-Type: text/plain; charset=UTF-8\r\n\r\n".encode())
 
         if not modo_reporte:
             encabezado = "Datos de captura {} {}\r\n".format(nombre_proyecto(), version())
@@ -307,6 +311,9 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
 
         if debug_activo:
             log_debug("SMTP", "Enviando fin de mensaje...")
+        if html:
+            sock.write(b"</pre>\r\n")
+
         sock.write(b".\r\n")
         _leer_respuesta_smtp(sock, 250, debug_activo=debug_activo)
 
