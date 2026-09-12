@@ -3,38 +3,31 @@
 """
 ITV LEO V9.4 Visualizador de Datos
 Genera un dashboard HTML interactivo a partir de los emails de datos de captura del sistema ITV LEO.
-
 Uso:
-    python leo_visualizer.py datos.txt
+python leo_visualizer.py datos.txt
 Genera:
-    datos.html
-
+datos.html
 Requisitos: solo Python 3.7+ (libreria estandar)
 """
-
 import sys
 import re
 import json
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta
-
 SAT_COLORS = {
-    'TRISAT-4':  '#e74c3c',
-    'MORSAT-1':  '#3498db',
-    'KOSAR-1.5': '#2ecc71',
-    'SM-3.1':    '#f39c12',
-    'NORBY-2':   '#9b59b6',
-    'MULE-4T':   '#1abc9c',
-    'HUCSat':    '#e91e63',
-    'BASE':      '#7f8c8d',
-    'PASE':      '#2c3e50',
+'TRISAT-4':  '#e74c3c',
+'MORSAT-1':  '#3498db',
+'KOSAR-1.5': '#2ecc71',
+'SM-3.1':    '#f39c12',
+'NORBY-2':   '#9b59b6',
+'MULE-4T':   '#1abc9c',
+'HUCSat':    '#e91e63',
+'BASE':      '#7f8c8d',
+'PASE':      '#2c3e50',
 }
-
 def get_color(name):
     return SAT_COLORS.get(name, '#95a5a6')
-
-
 def split_by_gaps(items, gap_minutes=30):
     """Inserta None entre items separados por mas de gap_minutes.
     Rompe la linea en Plotly entre pases diferentes del mismo satelite."""
@@ -53,10 +46,8 @@ def split_by_gaps(items, gap_minutes=30):
             phantom['ram'] = None
             phantom['temp'] = None
             result.append(phantom)
-        result.append(items[i])
+            result.append(items[i])
     return result
-
-
 def is_valid_date(dt_str):
     """Filtra fechas de RTC no sincronizado (ej: 2000-01-01)."""
     try:
@@ -64,12 +55,9 @@ def is_valid_date(dt_str):
         return year >= 2024
     except:
         return False
-
-
 def parse_file(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         raw = f.read()
-
     # CORREGIDO: RST=xxx es opcional entre IRQ y E=
     hb_pattern = re.compile(
         r'HB\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+'
@@ -79,7 +67,6 @@ def parse_file(filepath):
         r'(?:RST=(\d+)\s+)?'
         r'(?:E=(\S+)\s+)?T=([\d.]+)\s+V=(\w+)\s+FS=(\d+)'
     )
-
     cap_pattern = re.compile(
         r'SAT=(\S+)\s+HORA=(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+'
         r'RSSI=([\-\d.]+)\s+SNR=([\-\d.]+)\s+'
@@ -87,9 +74,7 @@ def parse_file(filepath):
         r'RXIQ=(\w+)\s+CRC=(\w+)\s+IMPL=(\w+)\s+PLEN=(\d+)\s+MODO=(\w+)\s+'
         r'DATA=(\S+)'
     )
-
     meta_pattern = re.compile(r'---BEGIN_META---\n(.*?)\n---END_META---', re.DOTALL)
-
     sys_pattern = re.compile(
         r'RSSI WiFi:\s+([\-\d]+)\s+dBm.*?'
         r'Temperatura CPU:\s+([\d.]+)C.*?'
@@ -97,19 +82,17 @@ def parse_file(filepath):
         r'Paquetes capturados:\s+(\d+)\s+Descartados:\s+(\d+)',
         re.DOTALL
     )
-
     # CORREGIDO: V9.[14] en lugar de V9.1, y fecha permisiva (sin $ al final)
     agenda_header_pattern = re.compile(
-        r'Reporte diario de pases LEO V9\.[14]\n={2,}\n'
+        r'Reporte diario de pases LEO V9\.[14]\n'
+        r'={2,}\n'
         r'RSSI WiFi:\s+[\-\d]+\s+dBm\n'
         r'Fecha Agenda:\s+(\d{4}-\d{2}-\d{2})'
     )
-
     # CORREGIDO: Sat[eé]lite para aceptar tilde
     pase_line_pattern = re.compile(
         r'\*\s+\[\d{2}/\d{2}\]\s+Pase:\s+(\d{2}:\d{2})\s+a\s+(\d{2}:\d{2})\s+-\s+Sat[e\u00e9]lite:\s+(\S+)\s+\(Elev:\s+(\d+)\s+grados\s+-\s+Frec:\s+(\d+)\s+Hz\)'
     )
-
     heartbeats = []
     skipped_hb = 0
     for m in hb_pattern.finditer(raw):
@@ -136,7 +119,6 @@ def parse_file(filepath):
             'fan': m.group(16),
             'fs': int(m.group(17)),
         })
-
     captures = []
     for m in cap_pattern.finditer(raw):
         captures.append({
@@ -156,11 +138,9 @@ def parse_file(filepath):
             'mode': m.group(14),
             'data': m.group(15),
         })
-
     metas = []
     for m in meta_pattern.finditer(raw):
         metas.append(m.group(1))
-
     systems = []
     for m in sys_pattern.finditer(raw):
         systems.append({
@@ -170,7 +150,6 @@ def parse_file(filepath):
             'captured': int(m.group(4)),
             'dropped': int(m.group(5)),
         })
-
     # Parsear agenda de pases diarios
     daily_passes = []
     for agenda_m in agenda_header_pattern.finditer(raw):
@@ -188,13 +167,11 @@ def parse_file(filepath):
         for pase_m in pase_line_pattern.finditer(block_text):
             start_time = pase_m.group(1)
             end_time = pase_m.group(2)
-
             # CORREGIDO: detectar pases que cruzan medianoche
             start_dt = datetime.strptime(f"{agenda_date} {start_time}:00", '%Y-%m-%d %H:%M:%S')
             end_dt = datetime.strptime(f"{agenda_date} {end_time}:00", '%Y-%m-%d %H:%M:%S')
             if end_dt < start_dt:
                 end_dt += timedelta(days=1)
-
             daily_passes.append({
                 'date': agenda_date,
                 'start': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
@@ -204,37 +181,28 @@ def parse_file(filepath):
                 'freq_hz': int(pase_m.group(5)),
                 'freq_mhz': int(pase_m.group(5)) / 1e6,
             })
-
     if skipped_hb > 0:
         print(f"   Heartbeats descartados (RTC no sincronizado): {skipped_hb}")
-
     return heartbeats, captures, metas, systems, daily_passes
-
-
 def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
     cap_by_sat = defaultdict(list)
     for c in captures:
         cap_by_sat[c['satellite']].append(c)
-
     pase_hbs = [hb for hb in heartbeats if hb['mode'] == 'PASE']
     base_hbs = [hb for hb in heartbeats if hb['mode'] == 'BASE']
-
     total_captures = len(captures)
     unique_sats = sorted(set(c['satellite'] for c in captures))
     total_hbs = len(heartbeats)
     total_pase = len(pase_hbs)
     total_base = len(base_hbs)
     total_daily_passes = len(daily_passes)
-
     if heartbeats:
         dtimes = [datetime.strptime(h['datetime'], '%Y-%m-%d %H:%M:%S') for h in heartbeats]
         date_min = min(dtimes).strftime('%Y-%m-%d %H:%M')
         date_max = max(dtimes).strftime('%Y-%m-%d %H:%M')
     else:
         date_min = date_max = 'N/A'
-
     # --- Datos para graficos ---
-
     rssi_traces = []
     for sat in unique_sats:
         items = sorted(cap_by_sat[sat], key=lambda x: x['datetime'])
@@ -247,7 +215,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
             'line': {'color': get_color(sat), 'width': 2},
             'marker': {'size': 8},
         })
-
     snr_traces = []
     for sat in unique_sats:
         items = sorted(cap_by_sat[sat], key=lambda x: x['datetime'])
@@ -260,7 +227,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
             'line': {'color': get_color(sat), 'width': 2},
             'marker': {'size': 8},
         })
-
     bar_counts = [len(cap_by_sat[s]) for s in unique_sats]
     bar_colors = [get_color(s) for s in unique_sats]
     bar_trace = [{
@@ -271,7 +237,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
         'text': [str(c) for c in bar_counts],
         'textposition': 'outside',
     }]
-
     # CORREGIDO: grafica de elevacion - usar heartbeats PASE con elevacion numerica
     elev_traces = []
     pase_sats = sorted(set(h['satellite'] for h in pase_hbs if h['satellite'] != '-'))
@@ -288,7 +253,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
                 'line': {'color': get_color(sat), 'width': 2},
                 'marker': {'size': 8},
             })
-
     temp_trace = [{
         'x': [h['datetime'] for h in heartbeats],
         'y': [h['temp'] for h in heartbeats],
@@ -297,7 +261,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
         'line': {'color': '#e74c3c', 'width': 2},
         'marker': {'size': 6},
     }]
-
     ram_trace = [{
         'x': [h['datetime'] for h in heartbeats],
         'y': [h['ram'] for h in heartbeats],
@@ -306,7 +269,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
         'line': {'color': '#3498db', 'width': 2},
         'marker': {'size': 6},
     }]
-
     # Trace de RST
     rst_hbs = [h for h in heartbeats if h.get('rst') is not None]
     rst_trace = [{
@@ -317,7 +279,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
         'line': {'color': '#f39c12', 'width': 2},
         'marker': {'size': 6},
     }]
-
     scatter_traces = []
     for sat in unique_sats:
         items = cap_by_sat[sat]
@@ -329,13 +290,11 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
             'marker': {'color': get_color(sat), 'size': 12, 'opacity': 0.8},
             'text': [i['datetime'] for i in items],
         })
-
     # Timeline de pases programados (Gantt-style)
     pass_timeline_traces = []
     pass_by_sat = defaultdict(list)
     for p in daily_passes:
         pass_by_sat[p['satellite']].append(p)
-
     timeline_sats = sorted(pass_by_sat.keys())
     for idx, sat in enumerate(timeline_sats):
         items = sorted(pass_by_sat[sat], key=lambda x: x['start'])
@@ -349,11 +308,9 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
                 'hoverinfo': 'text',
                 'text': f"{sat}<br>{p['start'][11:16]} &rarr; {p['end'][11:16]}<br>Elev: {p['elevation']}&deg;<br>Frec: {p['freq_mhz']:.3f} MHz",
             })
-
     # --- Datos para tablas ---
-
     cap_rows = []
-    for c in sorted(captures, key=lambda x: x['datetime'], reverse=True)[:50]:
+    for c in sorted(captures, key=lambda x: x['datetime'], reverse=True):
         cap_rows.append([
             c['satellite'], c['datetime'],
             f"{c['rssi']:.1f}", f"{c['snr']:.1f}",
@@ -361,9 +318,8 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
             str(c['cr']), c['mode'],
             c['data'][:40] + ('...' if len(c['data']) > 40 else '')
         ])
-
     hb_rows = []
-    for h in sorted(heartbeats, key=lambda x: x['datetime'], reverse=True)[:50]:
+    for h in sorted(heartbeats, key=lambda x: x['datetime'], reverse=True):
         hb_rows.append([
             h['datetime'], h['mode'],
             h['satellite'] if h['satellite'] != '-' else '—',
@@ -373,7 +329,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
             str(h['irq']), h['fan'],
             str(h['rst']) if h.get('rst') else '—'
         ])
-
     pass_rows = []
     for p in sorted(daily_passes, key=lambda x: x['start']):
         pass_rows.append([
@@ -384,7 +339,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
             str(p['elevation']),
             f"{p['freq_mhz']:.3f}",
         ])
-
     plotly_data = {
         'rssi': rssi_traces,
         'snr': snr_traces,
@@ -396,7 +350,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
         'scatter': scatter_traces,
         'pass_timeline': pass_timeline_traces,
     }
-
     sat_stats = []
     for sat in unique_sats:
         items = cap_by_sat[sat]
@@ -414,7 +367,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
             'sf': items[0]['sf'],
             'bw': items[0]['bw'],
         })
-
     # Estadisticas de pases programados
     pass_stats = []
     for sat in sorted(pass_by_sat.keys()):
@@ -428,13 +380,10 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
             'elev_max': max(elevs),
             'elev_avg': sum(elevs) / len(elevs),
         })
-
     latest_sys = systems[-1] if systems else None
-
     parts = []
     def hp(s):
         parts.append(s)
-
     hp('<!DOCTYPE html>')
     hp('<html lang="es">')
     hp('<head>')
@@ -472,17 +421,20 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
     hp('td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-family: "SF Mono", monospace; font-size: 0.8rem; }')
     hp('tr:hover td { background: rgba(255,255,255,0.03); }')
     hp('.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; font-family: sans-serif; }')
+    hp('th.sortable-th { cursor: pointer; user-select: none; position: relative; padding-right: 20px; transition: color 0.15s; }')
+    hp('th.sortable-th:hover { color: #ffffff; }')
+    hp("th.sortable-th::after { content: '\\21C5'; position: absolute; right: 6px; opacity: 0.35; font-size: 0.8em; }")
+    hp("th.sortable-th.sort-asc::after { content: '\\25B2'; opacity: 1; color: var(--accent); }")
+    hp("th.sortable-th.sort-desc::after { content: '\\25BC'; opacity: 1; color: var(--accent); }")
     hp('.footer { text-align: center; color: var(--text-dim); font-size: 0.8rem; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }')
     hp('@media (max-width: 600px) { body { padding: 10px; } .header h1 { font-size: 1.4rem; } }')
     hp('</style>')
     hp('</head>')
     hp('<body>')
-
     hp('<div class="header">')
     hp('<h1>&#128752; ITV LEO V9.4 - Dashboard de Capturas</h1>')
     hp(f'<p>Periodo: {date_min} &rarr; {date_max} | Sistema ITV LEO en techo</p>')
     hp('</div>')
-
     cpu_temp_str = f"{latest_sys['cpu_temp']:.1f}" if latest_sys else "N/A"
     hp('<div class="summary-grid">')
     hp(f'<div class="summary-item"><div class="summary-value">{total_captures}</div><div class="summary-label">Paquetes Capturados</div></div>')
@@ -494,7 +446,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
     if total_daily_passes > 0:
         hp(f'<div class="summary-item"><div class="summary-value">{total_daily_passes}</div><div class="summary-label">Pases Programados</div></div>')
     hp('</div>')
-
     hp('<h2 style="color:var(--accent); margin-bottom:16px; font-size:1.3rem;">&#128202; Estadisticas por Satelite (Capturas)</h2>')
     hp('<div class="grid">')
     for stat in sat_stats:
@@ -508,7 +459,6 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
         hp(f'<div class="stat-row"><span class="stat-label">SNR rango</span><span class="stat-value">{stat["snr_min"]:.1f} &rarr; {stat["snr_max"]:.1f}</span></div>')
         hp('</div>')
     hp('</div>')
-
     if pass_stats:
         hp('<h2 style="color:var(--accent); margin-bottom:16px; font-size:1.3rem;">&#128197; Estadisticas de Pases Programados</h2>')
         hp('<div class="grid">')
@@ -520,9 +470,7 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
             hp(f'<div class="stat-row"><span class="stat-label">Elev. rango</span><span class="stat-value">{stat["elev_min"]}&deg; &rarr; {stat["elev_max"]}&deg;</span></div>')
             hp('</div>')
         hp('</div>')
-
     hp('<h2 style="color:var(--accent); margin-bottom:16px; font-size:1.3rem;">&#128200; Graficos</h2>')
-
     charts = [
         ('chart-rssi', 'RSSI vs Tiempo (por satelite)', 'RSSI (dBm)'),
         ('chart-snr', 'SNR vs Tiempo (por satelite)', 'SNR (dB)'),
@@ -532,20 +480,15 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
     ]
     for cid, title, ytitle in charts:
         hp(f'<div class="chart-container"><div class="chart-title">{title}</div><div id="{cid}" style="width:100%; height:420px;"></div></div>')
-
     if pass_timeline_traces:
         hp('<div class="chart-container"><div class="chart-title">Timeline de Pases Programados (Agenda)</div><div id="chart-passes" style="width:100%; height:320px;"></div></div>')
-
     hp('<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">')
     hp('<div class="chart-container"><div class="chart-title">Temperatura CPU vs Tiempo</div><div id="chart-temp" style="width:100%; height:320px;"></div></div>')
     hp('<div class="chart-container"><div class="chart-title">RAM Libre vs Tiempo</div><div id="chart-ram" style="width:100%; height:320px;"></div></div>')
     hp('</div>')
-
     if rst_trace[0]['x']:
         hp('<div class="chart-container"><div class="chart-title">Contador de Reinicios (RST) vs Tiempo</div><div id="chart-rst" style="width:100%; height:280px;"></div></div>')
-
     hp('<h2 style="color:var(--accent); margin:24px 0 16px; font-size:1.3rem;">&#128203; Tablas de Datos</h2>')
-
     if pass_rows:
         hp('<div class="table-container"><div class="chart-title">Pases Programados (Agenda)</div>')
         hp('<table><thead><tr><th>Fecha</th><th>Inicio</th><th>Fin</th><th>Satelite</th><th>Elev. Max</th><th>Frec MHz</th></tr></thead><tbody>')
@@ -555,27 +498,25 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
             hp(f'<td><span class="badge" style="background:{sat_color}22; color:{sat_color}; border:1px solid {sat_color}44;">{row[3]}</span></td>')
             hp(f'<td>{row[4]}&deg;</td><td>{row[5]}</td></tr>')
         hp('</tbody></table></div>')
-
-    hp('<div class="table-container"><div class="chart-title">Ultimas 50 Capturas</div>')
-    hp('<table><thead><tr><th>Satelite</th><th>Hora</th><th>RSSI</th><th>SNR</th><th>Frec MHz</th><th>SF</th><th>BW</th><th>CR</th><th>Modo</th><th>Data hex</th></tr></thead><tbody>')
+    hp(f'<div class="table-container"><div class="chart-title">Todas las Capturas ({len(cap_rows)})</div>')
+    hp('<table id="cap-table"><thead><tr><th>Satelite</th><th>Hora</th><th>RSSI</th><th>SNR</th><th>Frec MHz</th><th>SF</th><th>BW</th><th>CR</th><th>Modo</th><th>Data hex</th></tr></thead><tbody>')
     for row in cap_rows:
         sat_color = get_color(row[0])
-        hp(f'<tr><td><span class="badge" style="background:{sat_color}22; color:{sat_color}; border:1px solid {sat_color}44;">{row[0]}</span></td>')
-        hp(f'<td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td><td>{row[5]}</td><td>{row[6]}</td><td>{row[7]}</td><td>{row[8]}</td>')
+        hp(f'<tr><td data-value="{row[0]}"><span class="badge" style="background:{sat_color}22; color:{sat_color}; border:1px solid {sat_color}44;">{row[0]}</span></td>')
+        # CORREGIDO: añadir data-value a la celda Hora (row[1])
+        hp(f'<td data-value="{row[1]}">{row[1]}</td><td data-value="{row[2]}">{row[2]}</td><td data-value="{row[3]}">{row[3]}</td><td data-value="{row[4]}">{row[4]}</td><td>{row[5]}</td><td>{row[6]}</td><td>{row[7]}</td><td>{row[8]}</td>')
         hp(f'<td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;">{row[9]}</td></tr>')
     hp('</tbody></table></div>')
-
-    hp('<div class="table-container"><div class="chart-title">Ultimos 50 Heartbeats</div>')
-    hp('<table><thead><tr><th>Hora</th><th>Modo</th><th>Satelite</th><th>Frec MHz</th><th>SF</th><th>BW</th><th>CR</th><th>Elev</th><th>Temp C</th><th>RAM</th><th>IRQ</th><th>Vent</th><th>RST</th></tr></thead><tbody>')
+    hp(f'<div class="table-container"><div class="chart-title">Todos los Heartbeats ({len(hb_rows)})</div>')
+    hp('<table id="hb-table"><thead><tr><th>Hora</th><th>Modo</th><th>Satelite</th><th>Frec MHz</th><th>SF</th><th>BW</th><th>CR</th><th>Elev</th><th>Temp C</th><th>RAM</th><th>IRQ</th><th>Vent</th><th>RST</th></tr></thead><tbody>')
     for row in hb_rows:
         mode_color = '#2ecc71' if row[1] == 'PASE' else '#7f8c8d'
-        hp(f'<tr><td>{row[0]}</td><td><span class="badge" style="background:{mode_color}22; color:{mode_color}; border:1px solid {mode_color}44;">{row[1]}</span></td>')
-        hp(f'<td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td><td>{row[5]}</td><td>{row[6]}</td><td>{row[7]}</td><td>{row[8]}</td><td>{row[9]}</td><td>{row[10]}</td><td>{row[11]}</td><td>{row[12]}</td></tr>')
+        # CORREGIDO: añadir data-value a la celda Hora (row[0])
+        hp(f'<tr><td data-value="{row[0]}">{row[0]}</td><td data-value="{row[1]}"><span class="badge" style="background:{mode_color}22; color:{mode_color}; border:1px solid {mode_color}44;">{row[1]}</span></td>')
+        hp(f'<td data-value="{row[2]}">{row[2]}</td><td data-value="{row[3]}">{row[3]}</td><td>{row[4]}</td><td>{row[5]}</td><td>{row[6]}</td><td>{row[7]}</td><td>{row[8]}</td><td data-value="{row[9]}">{row[9]}</td><td data-value="{row[10]}">{row[10]}</td><td data-value="{row[11]}">{row[11]}</td><td>{row[12]}</td></tr>')
     hp('</tbody></table></div>')
-
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     hp(f'<div class="footer">Generado el {now_str} | ITV LEO V9.4 Visualizador | Datos parseados: {total_captures} capturas, {total_hbs} heartbeats, {total_daily_passes} pases programados</div>')
-
     hp('<script>')
     hp('const plotlyConfig = { responsive: true, displayModeBar: true, displaylogo: false };')
     hp('')
@@ -601,28 +542,76 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
         hp("Plotly.newPlot('chart-rst', data.rst, {...plotlyLayout, yaxis: {...plotlyLayout.yaxis, title: 'RST contador'}, xaxis: {...plotlyLayout.xaxis, title: 'Hora'}, showlegend: false}, plotlyConfig);")
     if pass_timeline_traces:
         hp("Plotly.newPlot('chart-passes', data.pass_timeline, {...plotlyLayout, yaxis: {...plotlyLayout.yaxis, title: 'Satelite', autorange: 'reversed'}, xaxis: {...plotlyLayout.xaxis, title: 'Hora'}, showlegend: false, hovermode: 'closest'}, plotlyConfig);")
+    hp('')
+    hp('// --- Tablas ordenables por columna (clic en cabecera, alterna asc/desc) ---')
+    hp('function makeSortable(tableId, columns) {')
+    hp("    const table = document.getElementById(tableId);")
+    hp('    if (!table) return;')
+    hp("    const ths = table.querySelectorAll('thead th');")
+    hp("    const tbody = table.querySelector('tbody');")
+    hp('    let activeCol = null;')
+    hp("    let activeDir = 'asc';")
+    hp('    columns.forEach(function(col) {')
+    hp('        const th = ths[col.index];')
+    hp("        if (!th) return;")
+    hp("        th.classList.add('sortable-th');")
+    hp("        th.addEventListener('click', function() {")
+    hp("            activeDir = (activeCol === col.index && activeDir === 'asc') ? 'desc' : 'asc';")
+    hp('            activeCol = col.index;')
+    hp("            ths.forEach(function(t) { t.classList.remove('sort-asc', 'sort-desc'); });")
+    hp("            th.classList.add(activeDir === 'asc' ? 'sort-asc' : 'sort-desc');")
+    hp("            const rows = Array.from(tbody.querySelectorAll('tr'));")
+    hp('            rows.sort(function(a, b) {')
+    hp("                const av = a.children[col.index].dataset.value || '';")
+    hp("                const bv = b.children[col.index].dataset.value || '';")
+    hp("                let cmp;")
+    hp("                if (col.type === 'num') {")
+    hp('                    cmp = parseFloat(av) - parseFloat(bv);')
+    hp('                } else {')
+    hp("                    cmp = av.localeCompare(bv, undefined, {numeric: true, sensitivity: 'base'});")
+    hp('                }')
+    hp("                return activeDir === 'asc' ? cmp : -cmp;")
+    hp('            });')
+    hp('            rows.forEach(function(r) { tbody.appendChild(r); });')
+    hp('        });')
+    hp('    });')
+    hp('}')
+    hp('')
+    # CORREGIDO: añadir columna Hora (index 1) como ordenable en cap-table
+    hp("makeSortable('cap-table', [")
+    hp("    {index: 0, type: 'text'},  // Satelite")
+    hp("    {index: 1, type: 'text'},  // Hora")
+    hp("    {index: 2, type: 'num'},   // RSSI")
+    hp("    {index: 3, type: 'num'},   // SNR")
+    hp("    {index: 4, type: 'num'}    // Frec MHz")
+    hp(']);')
+    hp('')
+    # CORREGIDO: añadir columna Hora (index 0) como ordenable en hb-table
+    hp("makeSortable('hb-table', [")
+    hp("    {index: 0, type: 'text'},  // Hora")
+    hp("    {index: 1, type: 'text'},  // Modo")
+    hp("    {index: 2, type: 'text'},  // Satelite")
+    hp("    {index: 3, type: 'num'},   // Frec MHz")
+    hp("    {index: 9, type: 'num'},   // RAM")
+    hp("    {index: 10, type: 'num'},  // IRQ")
+    hp("    {index: 11, type: 'text'}  // Vent")
+    hp(']);')
     hp('</script>')
     hp('</body>')
     hp('</html>')
-
     with open(outfile, 'w', encoding='utf-8') as f2:
         f2.write('\n'.join(parts))
     print(f"HTML generado: {os.path.abspath(outfile)}")
-
-
 def main():
     if len(sys.argv) < 2:
         print("Uso: python leo_visualizer.py <fichero_datos.txt>")
         print("Ejemplo: python leo_visualizer.py Datos.txt")
         sys.exit(1)
-
     infile = sys.argv[1]
     if not os.path.exists(infile):
         print(f"Error: no se encuentra '{infile}'")
         sys.exit(1)
-
     outfile = os.path.join(os.getcwd(), os.path.basename(os.path.splitext(infile)[0]) + '.html')
-
     print(f"Leyendo: {infile}")
     heartbeats, captures, metas, systems, daily_passes = parse_file(infile)
     print(f"   Heartbeats V9.4 validos: {len(heartbeats)}")
@@ -634,7 +623,5 @@ def main():
         sys.exit(1)
     print("Generando HTML...")
     generate_html(heartbeats, captures, metas, systems, daily_passes, outfile)
-
-
 if __name__ == '__main__':
     main()
