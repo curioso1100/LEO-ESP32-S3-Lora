@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ITV LEO V9.4 Visualizador de Datos
+ITV LEO Visualizador de Datos
 Genera un dashboard HTML interactivo a partir de los emails de datos de captura del sistema ITV LEO.
 Uso:
 python leo_visualizer.py datos.txt
@@ -84,7 +84,7 @@ def parse_file(filepath):
     )
     # CORREGIDO: V9.[14] en lugar de V9.1, y fecha permisiva (sin $ al final)
     agenda_header_pattern = re.compile(
-        r'Reporte diario de pases LEO V9\.[14]\n'
+        r'Reporte diario de pases LEO V9\.\d+\n'
         r'={2,}\n'
         r'RSSI WiFi:\s+[\-\d]+\s+dBm\n'
         r'Fecha Agenda:\s+(\d{4}-\d{2}-\d{2})'
@@ -181,8 +181,46 @@ def parse_file(filepath):
                 'freq_hz': int(pase_m.group(5)),
                 'freq_mhz': int(pase_m.group(5)) / 1e6,
             })
+    # Deduplicar pases de la agenda: los emails "Pases diarios" sucesivos
+    # re-listan los mismos pases del dia al recomputarse (el inicio puede
+    # variar 1-2 min entre correos). La elevacion max y la hora de fin son
+    # estables, asi que forman la clave de deduplicacion.
+    seen_pase, pases_unique = set(), []
+    for p in daily_passes:
+        k = (p['satellite'], p['elevation'], p['end'])
+        if k not in seen_pase:
+            seen_pase.add(k)
+            pases_unique.append(p)
+    daily_passes = pases_unique
+
     if skipped_hb > 0:
         print(f"   Heartbeats descartados (RTC no sincronizado): {skipped_hb}")
+    # Deduplicar: los emails acumulativos y los emails duplicados repiten entradas
+    seen_hb, hb_unique = set(), []
+    for h in heartbeats:
+        k = (h['datetime'], h['mode'], h['satellite'])
+        if k not in seen_hb:
+            seen_hb.add(k); hb_unique.append(h)
+    heartbeats = hb_unique
+    seen_cap, cap_unique = set(), []
+    for c in captures:
+        k = (c['satellite'], c['datetime'], c['data'][:40])
+        if k not in seen_cap:
+            seen_cap.add(k); cap_unique.append(c)
+    captures = cap_unique
+    # Reclasificar capturas mal etiquetadas por el firmware usando la frecuencia
+    # de la agenda de cada satelite (ej.: tramas de NORBY-2 en 436.500 llegan
+    # etiquetadas como MULE-4T porque comparten firma de protocolo Geoscan).
+    freqs_by_sat = defaultdict(set)
+    for p in daily_passes:
+        freqs_by_sat[p['satellite']].add(round(p['freq_mhz'], 3))
+    for c in captures:
+        cf = round(c['freq'], 3)
+        if cf not in freqs_by_sat.get(c['satellite'], set()):
+            candidatos = [s for s, fs in freqs_by_sat.items()
+                          if cf in fs and s != c['satellite']]
+            if len(candidatos) == 1:
+                c['satellite'] = candidatos[0]
     return heartbeats, captures, metas, systems, daily_passes
 def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
     cap_by_sat = defaultdict(list)
@@ -389,7 +427,7 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
     hp('<head>')
     hp('<meta charset="UTF-8">')
     hp('<meta name="viewport" content="width=device-width, initial-scale=1.0">')
-    hp('<title>ITV LEO V9.4 - Dashboard de Capturas</title>')
+    hp('<title>ITV LEO - Dashboard de Capturas</title>')
     hp('<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>')
     hp('<style>')
     hp(':root { --bg: #0f172a; --card: #1e293b; --card-hover: #334155; --text: #e2e8f0; --text-dim: #94a3b8; --accent: #38bdf8; --border: #334155; }')
@@ -432,7 +470,7 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
     hp('</head>')
     hp('<body>')
     hp('<div class="header">')
-    hp('<h1>&#128752; ITV LEO V9.4 - Dashboard de Capturas</h1>')
+    hp('<h1>&#128752; ITV LEO - Dashboard de Capturas</h1>')
     hp(f'<p>Periodo: {date_min} &rarr; {date_max} | Sistema ITV LEO en techo</p>')
     hp('</div>')
     cpu_temp_str = f"{latest_sys['cpu_temp']:.1f}" if latest_sys else "N/A"
@@ -516,7 +554,7 @@ def generate_html(heartbeats, captures, metas, systems, daily_passes, outfile):
         hp(f'<td data-value="{row[2]}">{row[2]}</td><td data-value="{row[3]}">{row[3]}</td><td>{row[4]}</td><td>{row[5]}</td><td>{row[6]}</td><td>{row[7]}</td><td>{row[8]}</td><td data-value="{row[9]}">{row[9]}</td><td data-value="{row[10]}">{row[10]}</td><td data-value="{row[11]}">{row[11]}</td><td>{row[12]}</td></tr>')
     hp('</tbody></table></div>')
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    hp(f'<div class="footer">Generado el {now_str} | ITV LEO V9.4 Visualizador | Datos parseados: {total_captures} capturas, {total_hbs} heartbeats, {total_daily_passes} pases programados</div>')
+    hp(f'<div class="footer">Generado el {now_str} | ITV LEO Visualizador | Datos parseados: {total_captures} capturas, {total_hbs} heartbeats, {total_daily_passes} pases programados</div>')
     hp('<script>')
     hp('const plotlyConfig = { responsive: true, displayModeBar: true, displaylogo: false };')
     hp('')
@@ -614,12 +652,12 @@ def main():
     outfile = os.path.join(os.getcwd(), os.path.basename(os.path.splitext(infile)[0]) + '.html')
     print(f"Leyendo: {infile}")
     heartbeats, captures, metas, systems, daily_passes = parse_file(infile)
-    print(f"   Heartbeats V9.4 validos: {len(heartbeats)}")
+    print(f"   Heartbeats validos: {len(heartbeats)}")
     print(f"   Capturas: {len(captures)}")
     print(f"   Estados sistema: {len(systems)}")
     print(f"   Pases programados: {len(daily_passes)}")
     if not heartbeats and not captures and not daily_passes:
-        print("No se encontraron datos V9.4. El fichero tiene el formato correcto?")
+        print("No se encontraron datos. El fichero tiene el formato correcto?")
         sys.exit(1)
     print("Generando HTML...")
     generate_html(heartbeats, captures, metas, systems, daily_passes, outfile)
