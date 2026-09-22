@@ -13,6 +13,15 @@ from tiempo_satelites import obtener_unix_utc_real, obtener_tiempo_actual, forma
 
 CONFIG = obtener_config()
 
+# --- PATCH anti-duplicado ---
+# Flag: True si el servidor acepto el ultimo mensaje (respuesta 250 tras DATA).
+# fase4 lo consulta para NO reenviar un email ya entregado cuando falla el
+# cierre de la conexion (QUIT/221) despues de la entrega.
+_ultimo_ack_servidor = False
+
+def ultimo_envio_aceptado():
+    return _ultimo_ack_servidor
+
 
 def _limpiar_texto_cabecera(texto):
     return str(texto).replace("\r", " ").replace("\n", " ").strip()
@@ -88,6 +97,9 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
     import socket
     import ssl
     from tiempo_satelites import obtener_desfase_espana
+
+    global _ultimo_ack_servidor
+    _ultimo_ack_servidor = False
 
     log_info("SMTP", "Gestionando el envio de email")
     if debug_activo:
@@ -316,6 +328,8 @@ def enviar_correo_bloques(asunto, modo_reporte=False, texto_telemetria="", debug
 
         sock.write(b".\r\n")
         _leer_respuesta_smtp(sock, 250, debug_activo=debug_activo)
+        # PATCH anti-duplicado: a partir de aqui el servidor YA tiene el mensaje.
+        _ultimo_ack_servidor = True
 
         if debug_activo:
             log_debug("SMTP", "Cerrando conexion...")

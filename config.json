@@ -173,9 +173,14 @@
                 "offset": 0,
                 "valor": "0x8E",
                 "descripcion": "header_magic"
+              },
+              {
+                "offset": 2,
+                "valor": "0xFC",
+                "descripcion": "hdr2_fijo"
               }
             ],
-            "longitud_minima": 1,
+            "longitud_minima": 7,
             "familia_header": "mule4t"
           }
         },
@@ -193,47 +198,37 @@
           "buscar_parametros": false,
           "lora_sync_word": 18
         },
-        "POLYTECH-5": {
-          "id": "61745",
-          "frec": 437885000,
-          "ancho_banda_hz": "62500",
-          "lora_sf": 7,
+        "NORBY-2": {
+          "id": "57179",
+          "frec": 436500000,
+          "ancho_banda_hz": "250000",
+          "lora_sf": 10,
           "lora_cr": 5,
           "implicit_header": false,
           "payload_len": 255,
           "rx_iq": false,
           "lora_preamble_len": 8,
-          "crc_on": false,
+          "crc_on": true,
           "buscar_parametros": false,
-          "lora_sync_word": 18
-        },
-        "HOD-HOD-1A": {
-          "id": "61768",
-          "frec": 436250000,
-          "ancho_banda_hz": "62500",
-          "lora_sf": 8,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": true,
-          "lora_sync_word": 18
-        },
-        "VLADIVOSTOK-1": {
-          "id": "61751",
-          "frec": 436805000,
-          "ancho_banda_hz": "62500",
-          "lora_sf": 8,
-          "lora_cr": 5,
-          "implicit_header": false,
-          "payload_len": 255,
-          "rx_iq": false,
-          "lora_preamble_len": 8,
-          "crc_on": false,
-          "buscar_parametros": true,
-          "lora_sync_word": 18
+          "lora_sync_word": 18,
+          "nota": "NORBY-2 (57179). CONFIRMADO 436.500 MHz (19-sep-2026). Identificacion: byte[10]=0xEF (ID Geoscan), byte[0]=0x8E. 2 reglas + len_min=66; empate con MULE-4T (2 reglas, min=7) resuelto por len_min. Riesgos residuales: (1) trama NORBY <66 B caeria en MULE; (2) satelite Geoscan futuro con ID 0xEF se confundiria (improbable).",
+          "identificacion_header": {
+            "reglas": [
+              {
+                "offset": 0,
+                "valor": "0x8E",
+                "descripcion": "header_magic_geoscan"
+              },
+              {
+                "offset": 10,
+                "valor": "0xEF",
+                "descripcion": "norby_id_geoscan (UNICO discriminador fijo 11/11 tramas)"
+              }
+            ],
+            "longitud_minima": 66,
+            "familia_header": "geoscan_norby",
+            "nota_mask": "SOLO byte10=0xEF discrimina NORBY de MULE. byte30 NO usable (0xA1 pase 21-sep 22:47 / 0xA2 resto). byte65 NO usable (0x63/0x6B/0x5A). MULE nunca 0xEF (13 muestras: e1/b1)."
+          }
         }
       }
     }
@@ -268,7 +263,7 @@
   "max_logs_txt_lineas": 200,
   "max_errores_email_chars": 2000,
   "itv": {
-    "dias_maximos": 30,
+    "dias_maximos": 60,
     "ventilador_activaciones_7d": 15,
     "delta_temp_maxima_c": 10,
     "delta_rssi_db": 10,

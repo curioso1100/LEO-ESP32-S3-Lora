@@ -23,6 +23,7 @@ from logger import (
 from red import conectar_wifi, apagar_wifi, sincronizar_ntp
 from tiempo_satelites import obtener_tiempo_actual, obtener_unix_utc_real, obtener_desfase_espana
 from alertas import obtener_horas_pendientes_estado
+import alertas  # PATCH anti-duplicado: consultar ultimo_envio_aceptado()
 
 CONFIG = obtener_config()
 DEBUG_MODO = CONFIG.get("debug_consola", True)
@@ -226,10 +227,19 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None, t0=None, mx=None):
         asunto1 = "{}: Estado {} - {} CAP {} HB".format(
             nombre_proyecto(), version(), num_cap, num_hb)
         exito1 = _enviar_email_smtp(asunto1, cuerpo_estado, DEBUG_MODO, rssi_wifi, html=True)
+        entregado1 = alertas.ultimo_envio_aceptado()  # True = servidor respondio 250 a DATA
         del cuerpo_estado
         gc.collect()
 
-        if not exito1:
+        if entregado1:
+            # PATCH anti-duplicado: el servidor YA tiene el Email 1 aunque falle
+            # el cierre (QUIT/221). Se marca ANTES de cualquier reintento.
+            set_estado_enviado(True)
+            if not exito1:
+                log_warn("FASE4", "Email 1 entregado (ACK 250) pero fallo el cierre SMTP. Marcado como enviado para evitar duplicado.")
+                log_persistente("FASE4", "Email 1 entregado (ACK 250) pero fallo el cierre SMTP. Marcado como enviado.", "WARN")
+
+        if not exito1 and not entregado1:
             log_warn("FASE4", "Fallo Email 1 (Estado+HB). Se reintentara en proximo ciclo.")
             log_persistente("FASE4", "Fallo Email 1 (Estado+HB). Se reintentara en proximo ciclo.", "ERROR")
             return False
@@ -300,10 +310,19 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None, t0=None, mx=None):
             nombre_proyecto(), version(), num_trozo, total_trozos,
             linea_inicio, linea_fin, num_cap)
         exito_frag = _enviar_email_smtp(asunto_frag, cuerpo_frag, DEBUG_MODO, rssi_wifi)
+        entregado_frag = alertas.ultimo_envio_aceptado()
         del cuerpo_frag
         gc.collect()
 
-        if not exito_frag:
+        if entregado_frag:
+            # PATCH anti-duplicado: checkpoint aunque falle el cierre SMTP,
+            # porque el servidor ya acepto el fragmento (250 tras DATA).
+            checkpoint_capturas(lineas_en_trozo)
+            if not exito_frag:
+                log_warn("FASE4", "Fragmento {}/{} entregado (ACK 250) pero fallo el cierre SMTP. Checkpoint aplicado.".format(
+                    num_trozo, total_trozos))
+
+        if not exito_frag and not entregado_frag:
             log_warn("FASE4", "Fallo envio fragmento {}/{}. Abortando resto.".format(
                 num_trozo, total_trozos))
             log_persistente("FASE4", "Fallo envio fragmento {}/{}. Abortando resto.".format(
@@ -313,8 +332,6 @@ def enviar_email_estado(estado_pendiente, rssi_wifi=None, t0=None, mx=None):
 
         log_info("FASE4", "Fragmento {}/{} enviado correctamente".format(
             num_trozo, total_trozos))
-
-        checkpoint_capturas(lineas_en_trozo)
 
         if num_trozo < total_trozos:
             frag_delay = CONFIG.get("delay_entre_emails_seg", 60)
